@@ -51,6 +51,7 @@ const MODRINTH_API = 'https://api.modrinth.com/v2';
 const FABRIC_META = 'https://meta.fabricmc.net/v2';
 const ADOPTIUM_API = 'https://api.adoptium.net/v3';
 const MC_MANIFEST = 'https://launchermeta.mojang.com/mc/game/version_manifest_v2.json';
+const BMCLAPI = 'https://bmclapi2.bangbang93.com';
 const MC_MC_VERSION = '1.21.4';
 const SUPABASE_URL = 'https://qkgbzuiipphoisvvfdlo.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFrZ2J6dWlpcHBob2lzdnZmZGxvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1MDY4MTksImV4cCI6MjEwMTA4MjgxOX0.3-09YAgOGLZlVdpB06OoLpd20Ckt-AiyfePnv9jgkDQ';
@@ -481,6 +482,22 @@ async function getMinecraftVersionJson() {
   return verJson;
 }
 
+function patchVanillaVersionJson() {
+  const srcPath = path.join(VERSIONS_DIR, MC_MC_VERSION, `${MC_MC_VERSION}.json`);
+  const patchedPath = path.join(VERSIONS_DIR, `${MC_MC_VERSION}.patched.json`);
+  const raw = fs.readFileSync(srcPath, 'utf8');
+  const out = raw
+    .replace(/https:\/\/piston-data\.mojang\.com/g, BMCLAPI)
+    .replace(/https:\/\/launcher\.mojang\.com/g, BMCLAPI)
+    .replace(/https:\/\/libraries\.minecraft\.net/g, `${BMCLAPI}/libraries`);
+  if (out !== raw) {
+    fs.writeFileSync(patchedPath, out);
+  } else if (!fs.existsSync(patchedPath)) {
+    fs.copyFileSync(srcPath, patchedPath);
+  }
+  return patchedPath;
+}
+
 function stripJsonBom(file) {
   try {
     const b = fs.readFileSync(file);
@@ -578,6 +595,13 @@ function onMcEvent(e) {
     }
   } else if (e.type === 'status' && e.task) {
     setLaunch({ status: e.task });
+  } else if (e.type === 'assets' || e.type === 'classes' || e.type === 'classes-custom' || e.type === 'classes-maven') {
+    const total = e.total || 1;
+    const frac = Math.max(0, Math.min(1, (e.task || 0) / total));
+    setLaunch({
+      progress: 0.8 + frac * 0.15,
+      status: e.type === 'assets' ? 'O\'yin resurslari yuklanmoqda...' : 'Kutubxonalar yuklanmoqda...',
+    });
   }
 }
 
@@ -593,6 +617,8 @@ async function launchMinecraft(options) {
   log('LAUNCH: profileId =', profileId);
   setLaunch({ progress: 0.3, status: 'Minecraft yuklanmoqda...' });
   await getMinecraftVersionJson();
+  const patchedJson = patchVanillaVersionJson();
+  log('LAUNCH: patched version json:', patchedJson);
   log('LAUNCH: version json ok');
   setLaunch({ progress: 0.45, status: 'Modlar tekshirilmoqda...' });
   await downloadMods(MC_MC_VERSION);
@@ -621,6 +647,8 @@ async function launchMinecraft(options) {
       detached: false,
       hideWindow: false,
       cwd: MC_DIR,
+      versionJson: patchedJson,
+      url: { resource: `${BMCLAPI}/assets` },
     },
   };
   return new Promise((resolve, reject) => {

@@ -7,7 +7,7 @@ export const SITE_DOMAIN = 'mixervisuals.su';
 
 // Yuklab olish — GitHub Releases dan
 export const DOWNLOAD_URL = 'https://github.com/MixerVisualsUz/MixerVisuals/releases/latest/download/MixerVisualsLauncher.exe';
-export const DOWNLOAD_VERSION = 'v1.4';
+export const DOWNLOAD_VERSION = 'v1.4.1';
 
 // Background images — dark atmospheric scenes
 export const BG_IMAGE = import.meta.env.BASE_URL + 'bg/1.jpg';
