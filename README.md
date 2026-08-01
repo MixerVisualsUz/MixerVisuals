@@ -4,7 +4,7 @@ Minecraft 1.21.4 uchun visual helper: launcher + mod + obuna tizimi (Supabase).
 
 ## Sayt va yuklab olish
 
-- **Sayt:** https://mixervisualsuz.github.io/MixerVisuals/
+- **Sayt:** https://mixervisualsuz.github.io/
 - **Launcher:** [MixerVisualsLauncher.exe](https://github.com/MixerVisualsUz/MixerVisuals/releases/latest/download/MixerVisualsLauncher.exe)
 - **Mod (faqat binary):** [MixerVisuals.jar](https://github.com/MixerVisualsUz/MixerVisuals/releases/latest/download/MixerVisuals.jar)
 
