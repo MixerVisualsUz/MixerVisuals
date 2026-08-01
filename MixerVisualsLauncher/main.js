@@ -6,20 +6,34 @@ const childProcess = require('child_process');
 const { spawn, execSync } = childProcess;
 
 let gameProcess = null;
+let launcherQuitting = false;
 const originalSpawn = childProcess.spawn;
 childProcess.spawn = function (...args) {
-  const proc = originalSpawn.apply(this, args);
   const exe = String(args[0] || '').toLowerCase();
-  if (exe.includes('java') || (proc && proc.spawnargs && proc.spawnargs.join(' ').includes('net.fabricmc'))) {
+  const spawnArgs = args[1] && args[1].join ? args[1].join(' ') : '';
+  const isJavaLaunch = exe.includes('java') || spawnArgs.includes('net.fabricmc');
+  if (isJavaLaunch) {
+    args[2] = Object.assign({}, args[2], { detached: true, stdio: 'ignore' });
+  }
+  const proc = originalSpawn.apply(this, args);
+  if (isJavaLaunch) {
     gameProcess = proc;
     proc.once('spawn', () => {
       setLaunch({ progress: 1, state: 'running', status: 'O\'yin boshlanmoqda...' });
-      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
+      quitLauncher();
     });
     proc.once('exit', (code, signal) => { log('GAME PROC exit, code =', code, ', signal =', signal); });
   }
   return proc;
 };
+
+function quitLauncher() {
+  if (launcherQuitting) return;
+  launcherQuitting = true;
+  try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.destroy(); } catch (_) {}
+  app.quit();
+  setTimeout(() => process.exit(0), 3000).unref();
+}
 
 const { Client, Authenticator } = require('minecraft-launcher-core');
 
@@ -591,7 +605,7 @@ function onMcEvent(e) {
     setLaunch({ progress: prog, status: e.task || e.status || lastLaunch.status });
     if (e.type === 'launch' && prog >= 1) {
       setLaunch({ state: 'running', status: 'O\'yin boshlanmoqda...' });
-      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
+      quitLauncher();
     }
   } else if (e.type === 'status' && e.task) {
     setLaunch({ status: e.task });
@@ -644,7 +658,7 @@ async function launchMinecraft(options) {
     javaPath: javaPath,
     window: { width: 1280, height: 720, fullscreen: false },
     overrides: {
-      detached: false,
+      detached: true,
       hideWindow: false,
       cwd: MC_DIR,
       versionJson: patchedJson,
@@ -836,13 +850,17 @@ ipcMain.handle('native:launchStart', async (_e, quickPlayServer) => {
       uuid: settings.uuid || '00000000-0000-0000-0000-000000000000',
       accountType: settings.accountType || 'local',
     }).then(() => {
-      mainWindow?.webContents.send('launch-status', 'oyin tugadi');
-      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) mainWindow.show();
+      if (!launcherQuitting) {
+        mainWindow?.webContents.send('launch-status', 'oyin tugadi');
+        if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) mainWindow.show();
+      }
     }).catch((e) => {
       console.error('Launch failed:', e);
       setLaunch({ state: 'failed', error: e.message });
-      mainWindow?.webContents.send('launch-error', e.message);
-      if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) mainWindow.show();
+      if (!launcherQuitting) {
+        mainWindow?.webContents.send('launch-error', e.message);
+        if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) mainWindow.show();
+      }
     });
     return { ok: true };
   } catch (e) {
