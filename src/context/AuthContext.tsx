@@ -54,14 +54,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let username = baseName;
     let insertRes = await supabase
       .from('profiles')
-      .insert({ id: uid, username, email: u.email || '', role: 'user', referral_code: username, blocked: false })
+      .insert({ id: uid, username, email: u.email || '', role: 'user', blocked: false })
       .select()
       .single();
     if (insertRes.error) {
       username = `${baseName}-${Math.random().toString(36).slice(2, 6)}`;
       insertRes = await supabase
         .from('profiles')
-        .insert({ id: uid, username, email: u.email || '', role: 'user', referral_code: username, blocked: false })
+        .insert({ id: uid, username, email: u.email || '', role: 'user', blocked: false })
         .select()
         .single();
     }
@@ -110,11 +110,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { success: true, message: 'Tizimga muvaffaqiyatli kirildi' };
   }, []);
 
-  const signUp = useCallback(async (username: string, email: string, password: string, referredBy?: string) => {
+  const signUp = useCallback(async (username: string, email: string, password: string) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { username, referred_by: referredBy || '' } },
+      options: { data: { username } },
     });
     if (error) return { success: false, message: translateError(error.message) };
     if (!data.user) return { success: false, message: 'Ro‘yxatdan o‘tish amalga oshmadi' };

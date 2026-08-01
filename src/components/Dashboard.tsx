@@ -1,17 +1,17 @@
 ﻿import { useState, useEffect } from 'react';
 import {
   Shield, CreditCard, KeyRound, Fingerprint, Clock, Calendar, Check, AlertCircle,
-  ArrowLeft, Upload, Users, Gift, Cloud, Link2, Tag, X, Download,
+  ArrowLeft, Upload, Gift, Cloud, Link2, Tag, X, Download,
   Timer, Ticket, PartyPopper, RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button, Card, Badge, Input, Spinner, CopyButton } from './ui';
 import { supabase } from '../lib/supabase';
 import { PLANS, formatPrice, planByCode } from '../lib/plans';
-import { HUMO_CARD, HUMO_OWNER, SITE_DOMAIN, DOWNLOAD_URL, DOWNLOAD_VERSION } from '../lib/constants';
+import { HUMO_CARD, HUMO_OWNER, DOWNLOAD_URL, DOWNLOAD_VERSION } from '../lib/constants';
 import type { Plan, Payment } from '../lib/types';
 
-type DashView = 'panel' | 'pricing' | 'payment' | 'referral' | 'ecosystem' | 'bonus';
+type DashView = 'panel' | 'pricing' | 'payment' | 'ecosystem' | 'bonus';
 
 export function Dashboard({ initialView = 'panel' }: { initialView?: DashView }) {
   const { profile, signOut, refreshProfile } = useAuth();
@@ -72,7 +72,6 @@ export function Dashboard({ initialView = 'panel' }: { initialView?: DashView })
 
   const tabs: { id: DashView; label: string }[] = [
     { id: 'panel', label: 'Panel' },
-    { id: 'referral', label: 'Referal' },
     { id: 'ecosystem', label: 'Configlar' },
     { id: 'bonus', label: 'Bonus' },
   ];
@@ -107,7 +106,6 @@ export function Dashboard({ initialView = 'panel' }: { initialView?: DashView })
       </div>
 
       {view === 'panel' && <PanelView onBuy={() => setView('pricing')} onBuyHwid={() => { setSelectedPlan('hwid_reset'); setView('payment'); }} planName={planName} />}
-      {view === 'referral' && <ReferralView />}
       {view === 'ecosystem' && <EcosystemView />}
       {view === 'bonus' && <BonusView />}
     </div>
@@ -482,71 +480,6 @@ function PaymentView({ plan, onBack, onPaid }: { plan: Plan; onBack: () => void;
           <Button className="w-full mt-4" onClick={submitPayment} disabled={submitting}>{submitting ? <Spinner /> : 'To‘lovni tasdiqlash'}</Button>
         </Card>
       </div>
-    </div>
-  );
-}
-
-// ============ REFERRAL ============
-function ReferralView() {
-  const { profile } = useAuth();
-  const [refCount, setRefCount] = useState(0);
-  const [activeCount, setActiveCount] = useState(0);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!profile) return;
-    (async () => {
-      const { count } = await supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('referred_by', profile.id);
-      setRefCount(count || 0);
-      const { data } = await supabase.from('profiles').select('subscription_plan').eq('referred_by', profile.id).not('subscription_plan', 'is', null);
-      setActiveCount(data?.length || 0);
-      setLoading(false);
-    })();
-  }, [profile]);
-
-  if (!profile) return null;
-  const refLink = `https://${SITE_DOMAIN}/?ref=${profile.referral_code}`;
-
-  return (
-    <div>
-      <Badge color="gold">Referal tizim</Badge>
-      <h2 className="mt-3 text-2xl font-bold text-white mb-2">Do‘stlaringizni taklif qiling va mukofotlar oling</h2>
-      <p className="text-zinc-500 mb-8">Har bir faol referal obunasidan 20% daromad oling.</p>
-      <div className="grid sm:grid-cols-2 gap-4 mb-6">
-        <Card className="p-6">
-          <div className="w-10 h-10 rounded-xl bg-[#ffffff]/10 border border-[#ffffff]/20 flex items-center justify-center mb-3">
-            <Users size={18} className="text-[#ffffff]" />
-          </div>
-          <div className="text-sm text-zinc-500">Jami referallar</div>
-          <div className="text-3xl font-bold text-white mt-1">{loading ? '...' : refCount}</div>
-        </Card>
-        <Card className="p-6">
-          <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-3">
-            <Gift size={18} className="text-blue-400" />
-          </div>
-          <div className="text-sm text-zinc-500">Xarid qilgan referallar</div>
-          <div className="text-3xl font-bold text-white mt-1">{loading ? '...' : activeCount}</div>
-        </Card>
-      </div>
-      <Card className="p-6 mb-6">
-        <h3 className="text-lg font-semibold text-white mb-1">Sizning referal kodingiz</h3>
-        <p className="text-sm text-zinc-400 mb-4">Do‘stlaringizga ushbu linkni ulashing.</p>
-        <div className="flex items-center justify-between bg-white/5 rounded-lg px-4 py-3 border border-white/10 gap-2">
-          <span className="text-white font-mono text-sm truncate">{refLink}</span>
-          <CopyButton text={refLink} />
-        </div>
-      </Card>
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold text-white mb-4">Taraqqiyot</h3>
-        {activeCount === 0 ? <p className="text-sm text-zinc-500">Hozirda faol referallaringiz yo‘q.</p> : <p className="text-sm text-zinc-500">{activeCount} ta faol referalingiz bor.</p>}
-        <div className="mt-4 flex items-center gap-3 p-4 rounded-xl bg-white/[0.03] border border-white/5">
-          <div className="w-10 h-10 rounded-full bg-[#ffffff]/15 border border-[#ffffff]/25 flex items-center justify-center text-[#ffffff] font-bold">1</div>
-          <div>
-            <div className="text-sm text-white font-medium">Daraja 1</div>
-            <div className="text-xs text-zinc-400">20% kun referal obunasidan</div>
-          </div>
-        </div>
-      </Card>
     </div>
   );
 }

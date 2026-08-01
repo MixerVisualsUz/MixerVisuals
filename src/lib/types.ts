@@ -7,8 +7,6 @@ export interface Profile {
   subscription_plan: string | null;
   subscription_expires: string | null;
   blocked: boolean;
-  referral_code: string;
-  referred_by: string | null;
   created_at: string;
 }
 
@@ -52,6 +50,6 @@ export interface Promocode {
 
 export type Route =
   | { name: 'landing' }
-  | { name: 'dashboard'; view: 'panel' | 'pricing' | 'payment' | 'referral' | 'ecosystem'; planCode?: string }
+  | { name: 'dashboard'; view: 'panel' | 'pricing' | 'payment' | 'ecosystem'; planCode?: string }
   | { name: 'admin' }
   | { name: 'documents' };

@@ -152,8 +152,7 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
     recordAttempt();
     setLoading(true);
     setError('');
-    const refParam = new URLSearchParams(window.location.search).get('ref') || undefined;
-    const res = await signUp(regForm.username, regForm.email, regForm.password, refParam);
+    const res = await signUp(regForm.username, regForm.email, regForm.password);
     setLoading(false);
     if (!res.success) {
       setError(res.message);

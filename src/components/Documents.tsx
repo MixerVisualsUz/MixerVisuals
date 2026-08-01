@@ -54,7 +54,6 @@ const docs = [
       { h: '3. To‘lov qilish', p: 'Humo karta raqamiga to‘lov qiling. Chek rasmini yuklang va "To‘lovni tasdiqlash" tugmasini bosing. Admin 24 soat ichida tasdiqlaydi.' },
       { h: '4. Modga kirish', p: 'Obuna faollashgach, modni yuklab oling. Modning kirish oynasida email va parolingizni kiriting — HWID avtomatik bog‘lanadi.' },
       { h: '5. Kalit faollashtirish', p: 'Agar sizda litsenziya kaliti bo‘lsa, uni "Kalit faollashtirish" bo‘limida kiriting. Obuna avtomatik faollashtiriladi.' },
-      { h: '6. Referal tizimi', p: 'Referal bo‘limida o‘zingizning referal linkingizni oling. Do‘stlaringizga ulashing va har bir faol obunadan 20% daromad oling.' },
     ],
   },
   {
