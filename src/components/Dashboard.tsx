@@ -2,6 +2,7 @@
 import {
   Shield, CreditCard, KeyRound, Fingerprint, Clock, Calendar, Check, AlertCircle,
   ArrowLeft, Upload, MessageCircle, Users, Gift, Cloud, Link2, Tag, X, Download,
+  Timer, Ticket, PartyPopper,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button, Card, Badge, Input, Spinner, CopyButton } from './ui';
@@ -10,7 +11,7 @@ import { PLANS, formatPrice, planByCode } from '../lib/plans';
 import { TELEGRAM_SUPPORT, HUMO_CARD, HUMO_OWNER, SITE_DOMAIN, DOWNLOAD_URL, DOWNLOAD_VERSION } from '../lib/constants';
 import type { Payment } from '../lib/types';
 
-type DashView = 'panel' | 'pricing' | 'payment' | 'referral' | 'ecosystem';
+type DashView = 'panel' | 'pricing' | 'payment' | 'referral' | 'ecosystem' | 'bonus';
 
 export function Dashboard({ initialView = 'panel' }: { initialView?: DashView }) {
   const { profile, signOut, refreshProfile } = useAuth();
@@ -48,7 +49,8 @@ export function Dashboard({ initialView = 'panel' }: { initialView?: DashView })
   const tabs: { id: DashView; label: string }[] = [
     { id: 'panel', label: 'Panel' },
     { id: 'referral', label: 'Referal' },
-    { id: 'ecosystem', label: 'Ekosistema' },
+    { id: 'ecosystem', label: 'Configlar' },
+    { id: 'bonus', label: 'Bonus' },
   ];
 
   return (
@@ -83,6 +85,7 @@ export function Dashboard({ initialView = 'panel' }: { initialView?: DashView })
       {view === 'panel' && <PanelView onBuy={() => setView('pricing')} />}
       {view === 'referral' && <ReferralView />}
       {view === 'ecosystem' && <EcosystemView />}
+      {view === 'bonus' && <BonusView />}
     </div>
   );
 }
@@ -535,5 +538,164 @@ function EcosystemView() {
         )}
       </Card>
     </div>
+  );
+}
+
+// ============ BONUS (BOX) ============
+type BoxResult =
+  | { type: 'promo'; code: string; discount_percent: number }
+  | { type: 'subscription'; expires: string }
+  | { type: 'error'; message: string };
+
+const BOX_CHANCES = [
+  { pct: 55, label: '10% chegirma', desc: 'BONUS10-XXXXXX promokodi', color: 'text-zinc-300 border-white/20 bg-white/5' },
+  { pct: 25, label: '25% chegirma', desc: 'BONUS25-XXXXXX promokodi', color: 'text-blue-300 border-blue-500/30 bg-blue-500/10' },
+  { pct: 15, label: '50% chegirma', desc: 'BONUS50-XXXXXX promokodi', color: 'text-amber-300 border-amber-500/30 bg-amber-500/10' },
+  { pct: 5, label: '1 oylik obuna', desc: 'Akkauntga to‘g‘ridan-to‘g‘ri qo‘shiladi', color: 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10' },
+];
+
+function BonusView() {
+  const { refreshProfile } = useAuth();
+  const [opening, setOpening] = useState(false);
+  const [result, setResult] = useState<BoxResult | null>(null);
+
+  const openBox = async () => {
+    if (opening) return;
+    setOpening(true);
+    setResult(null);
+    const { data, error } = await supabase.rpc('open_box');
+    setOpening(false);
+    if (error) {
+      if (error.message.includes('open_box')) {
+        setResult({ type: 'error', message: 'Bonus tizimi hozircha sozlanmagan. Administratorga murojaat qiling.' });
+      } else {
+        setResult({ type: 'error', message: 'Xatolik: ' + error.message });
+      }
+      return;
+    }
+    const r = data as (BoxResult & { error?: string });
+    if (r.error) { setResult({ type: 'error', message: r.error }); return; }
+    if (r.type === 'subscription') await refreshProfile();
+    setResult(r);
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-2">
+        <Gift size={22} className="text-[#ffffff]" />
+        <h2 className="text-2xl font-bold text-white">Bonus</h2>
+      </div>
+      <p className="text-zinc-500 mb-8">Kuniga 1 marta boxni oching va sovg‘alardan birini yutib oling.</p>
+
+      <div className="grid lg:grid-cols-2 gap-6 items-start">
+        {/* BOX */}
+        <Card className="relative p-8 overflow-hidden">
+          <div className="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-[#ffffff]/10 blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-24 -left-24 w-64 h-64 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
+
+          <div className="relative flex flex-col items-center text-center">
+            <div className={`relative ${opening ? 'animate-[scaleIn_0.4s_ease-out_infinite]' : 'animate-[float_4s_ease-in-out_infinite]'}`}>
+              <div className="absolute inset-0 rounded-full bg-[#ffffff]/15 blur-2xl scale-150" />
+              <div className="relative w-28 h-28 rounded-3xl bg-gradient-to-br from-[#ffffff]/25 to-[#ffffff]/5 border border-[#ffffff]/25 flex items-center justify-center shadow-[0_0_60px_rgba(255,255,255,0.25)]">
+                <Gift size={52} className="text-[#ffffff]" />
+              </div>
+              <SparkleDots />
+            </div>
+
+            <h3 className="mt-8 text-xl font-bold text-white">Sovg‘a qutisi</h3>
+            <p className="mt-2 text-sm text-zinc-400 max-w-sm">
+              Ochish orqali chegirma promokodi yoki 1 oylik obuna yutib olishingiz mumkin.
+            </p>
+
+            {!result && (
+              <Button size="lg" className="mt-7 relative overflow-hidden group" onClick={openBox} disabled={opening}>
+                {opening ? <Spinner /> : <><PartyPopper size={18} /> Boxni ochish</>}
+              </Button>
+            )}
+
+            {/* RESULT */}
+            {result && result.type === 'promo' && (
+              <div className="mt-7 w-full animate-[scaleIn_0.4s_ease-out_both]">
+                <div className="rounded-2xl p-5 bg-gradient-to-br from-amber-500/20 to-orange-500/10 border border-amber-500/30">
+                  <div className="text-xs uppercase tracking-wider text-amber-400 mb-1">Tabriklaymiz! {result.discount_percent}% chegirma</div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xl font-mono font-bold text-white tracking-wider">{result.code}</span>
+                    <CopyButton text={result.code} />
+                  </div>
+                  <p className="mt-3 text-xs text-zinc-400">Promokodni to‘lov sahifasida kiriting. 1 marta ishlatiladi.</p>
+                </div>
+                <button onClick={() => setResult(null)} className="mt-4 text-sm text-zinc-400 hover:text-white transition-colors">Yana ochish</button>
+              </div>
+            )}
+
+            {result && result.type === 'subscription' && (
+              <div className="mt-7 w-full animate-[scaleIn_0.4s_ease-out_both]">
+                <div className="rounded-2xl p-5 bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/30">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                      <Check size={20} className="text-emerald-400" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-sm font-semibold text-emerald-300">Sizning akkauntingizga 1 oylik obuna muvaffaqiyatli qo‘shildi</div>
+                      <div className="mt-1 text-xs text-zinc-400">Faol: {result.expires} gacha</div>
+                    </div>
+                  </div>
+                </div>
+                <button onClick={() => setResult(null)} className="mt-4 text-sm text-zinc-400 hover:text-white transition-colors">Yana ochish</button>
+              </div>
+            )}
+
+            {result && result.type === 'error' && (
+              <div className="mt-7 w-full animate-[scaleIn_0.4s_ease-out_both]">
+                <div className="rounded-2xl p-5 bg-red-500/10 border border-red-500/30 flex items-start gap-3">
+                  <AlertCircle size={20} className="text-red-400 shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-300 text-left">{result.message}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* CHANCES */}
+        <div>
+          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <Timer size={18} className="text-[#ffffff]" /> Sovg‘alar va ehtimolliklar
+          </h3>
+          <div className="space-y-3">
+            {BOX_CHANCES.map((c) => (
+              <Card key={c.pct} className="p-4 flex items-center gap-4">
+                <div className={`w-14 h-14 rounded-xl border flex items-center justify-center shrink-0 ${c.color}`}>
+                  <span className="text-sm font-bold">{c.pct}%</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-white">{c.label}</div>
+                  <div className="text-xs text-zinc-500 truncate">{c.desc}</div>
+                </div>
+                <div className="w-24 shrink-0">
+                  <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#ffffff] to-[#ffffff]/60" style={{ width: `${c.pct}%` }} />
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+          <p className="mt-4 text-xs text-zinc-600">Foizlar qat’iy belgilangan va har ochishda tasodifiy tanlanadi.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SparkleDots() {
+  return (
+    <>
+      {[
+        'top-0 left-2 animate-[particleFloat_2.5s_ease-in-out_infinite]',
+        'top-4 -right-3 animate-[particleFloat_3s_ease-in-out_0.5s_infinite]',
+        'bottom-2 -left-4 animate-[particleFloat_2.2s_ease-in-out_1s_infinite]',
+      ].map((pos, i) => (
+        <span key={i} className={`absolute w-2 h-2 rounded-full bg-[#ffffff]/60 ${pos}`} />
+      ))}
+    </>
   );
 }
