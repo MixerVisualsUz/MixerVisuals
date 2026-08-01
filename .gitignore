@@ -1,0 +1,43 @@
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.env
+.env.local
+
+# Downloads — GitHub Releases orqali tarqatiladi
+public/downloads/
+
+# Launcher (fayl yig'indilari va build chiqimlari)
+MixerVisualsLauncher/node_modules/
+MixerVisualsLauncher/dist/
+MixerVisualsLauncher/dist-win-unpacked/
+MixerVisualsLauncher/java21/
+MixerVisualsLauncher/cache/
+MixerVisualsLauncher/*.jar
+MixerVisualsLauncher/*.exe
+MixerVisualsLauncher/*.log
+MixerVisualsLauncher/*.lock
+MixerVisualsLauncher/.gradle/
+
+# Mod manbasi — maxfiy (binary sifatida tarqatiladi)
+MixerVisualsMod/
+supabase/.temp/

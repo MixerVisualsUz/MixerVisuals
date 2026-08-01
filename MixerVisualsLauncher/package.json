@@ -1,0 +1,52 @@
+{
+  "name": "mixer-visuals-launcher",
+  "version": "1.0.0",
+  "description": "Mixer Visuals Launcher",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win portable",
+    "build:mod": "cd mod && .\\gradlew.bat build",
+    "build:all": "npm run build:mod && npm run build"
+  },
+  "build": {
+    "appId": "me.reallyvisuals.launcher",
+    "productName": "Mixer Visuals",
+    "files": [
+      "main.js",
+      "preload.js",
+      "ui/**/*",
+      "assets/**/*",
+      "MixerVisuals.jar",
+      "java21/**",
+      "mods/**",
+      "mod/**/*",
+      "!mod/.gradle/**/*",
+      "!mod/build/**/*",
+      "!mod/workspace/**/*"
+    ],
+    "asarUnpack": [
+      "java21/**"
+    ],
+    "extraResources": [],
+    "win": {
+      "target": [
+        "portable",
+        "nsis"
+      ],
+      "icon": "assets/icons/app.ico",
+      "signAndEditExecutable": false
+    }
+  },
+  "devDependencies": {
+    "electron": "^43.2.0",
+    "electron-builder": "^24.0.0",
+    "electron-packager": "^17.1.2",
+    "png-to-ico": "^3.0.2"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.18",
+    "minecraft-launcher-core": "^3.18.2",
+    "sharp": "^0.35.3"
+  }
+}
