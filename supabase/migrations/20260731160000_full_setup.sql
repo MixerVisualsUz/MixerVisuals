@@ -271,8 +271,7 @@ INSERT INTO public.plans (code, name, price, duration_days, active) VALUES
   ('30days', '30 kun', 60000, 30, true),
   ('60days', '60 kun', 110000, 60, true),
   ('90days', '90 kun', 160000, 90, true),
-  ('180days', '180 kun', 280000, 180, true),
-  ('lifetime', 'Cheksiz', 150000, -1, false)
+  ('180days', '180 kun', 280000, 180, true)
 ON CONFLICT (code) DO UPDATE SET
   name = EXCLUDED.name,
   price = EXCLUDED.price,

@@ -75,11 +75,10 @@ function PaymentsTab() {
     const plan = planByCode(p.plan_code);
     if (!plan) return;
     await supabase.from('payments').update({ status: 'approved' }).eq('id', p.id);
-    let newExpires: string | null;
-    let newPlan = plan.code;
-    if (plan.duration_days === -1) { newExpires = null; newPlan = 'lifetime'; }
-    else { const base = new Date(); base.setDate(base.getDate() + plan.duration_days); newExpires = base.toISOString().slice(0, 10); }
-    await supabase.from('profiles').update({ subscription_plan: newPlan, subscription_expires: newExpires }).eq('id', p.user_id);
+    const base = new Date();
+    base.setDate(base.getDate() + plan.duration_days);
+    const newExpires = base.toISOString().slice(0, 10);
+    await supabase.from('profiles').update({ subscription_plan: plan.code, subscription_expires: newExpires }).eq('id', p.user_id);
     load();
   };
   const rejectPayment = async (id: string) => { await supabase.from('payments').update({ status: 'rejected' }).eq('id', id); load(); };
@@ -152,9 +151,9 @@ function UsersTab() {
   const grantSub = async (u: Profile) => {
     const plan = planByCode(grantPlan);
     if (!plan) return;
-    let expires: string | null;
-    if (plan.duration_days === -1) { expires = null; }
-    else { const base = new Date(); base.setDate(base.getDate() + plan.duration_days); expires = base.toISOString().slice(0, 10); }
+    const base = new Date();
+    base.setDate(base.getDate() + plan.duration_days);
+    const expires = base.toISOString().slice(0, 10);
     const { error } = await supabase
       .from('profiles')
       .update({ subscription_plan: plan.code, subscription_expires: expires })
@@ -312,7 +311,7 @@ function PlansTab() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <div className="text-white font-medium flex items-center gap-2">{p.name} <span className="text-xs font-mono text-zinc-500">{p.code}</span></div>
-                <div className="text-xs text-zinc-500 mt-1">{formatPrice(p.price)} • {p.duration_days === -1 ? 'Cheksiz' : `${p.duration_days} kun`}</div>
+                <div className="text-xs text-zinc-500 mt-1">{formatPrice(p.price)} • {p.duration_days} kun</div>
               </div>
               <div className="flex items-center gap-2">
                 {p.active ? <Badge color="gold">Faol</Badge> : <Badge color="gray">Faol emas</Badge>}

@@ -94,7 +94,7 @@ export function Dashboard({ initialView = 'panel' }: { initialView?: DashView })
         ))}
       </div>
 
-      {view === 'panel' && <PanelView onBuy={() => setView('pricing')} planName={planName} isLifetime={(code) => allPlans.find((p) => p.code === code)?.duration_days === -1} />}
+      {view === 'panel' && <PanelView onBuy={() => setView('pricing')} planName={planName} />}
       {view === 'referral' && <ReferralView />}
       {view === 'ecosystem' && <EcosystemView />}
       {view === 'bonus' && <BonusView />}
@@ -103,7 +103,7 @@ export function Dashboard({ initialView = 'panel' }: { initialView?: DashView })
 }
 
 // ============ PANEL ============
-function PanelView({ onBuy, planName, isLifetime }: { onBuy: () => void; planName: (code: string) => string | undefined; isLifetime: (code: string) => boolean }) {
+function PanelView({ onBuy, planName }: { onBuy: () => void; planName: (code: string) => string | undefined }) {
   const { profile, refreshProfile } = useAuth();
   const [keyInput, setKeyInput] = useState('');
   const [keyMsg, setKeyMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
@@ -124,7 +124,6 @@ function PanelView({ onBuy, planName, isLifetime }: { onBuy: () => void; planNam
   if (!profile) return null;
 
   const hasSub = !!profile.subscription_plan;
-  const life = hasSub && isLifetime(profile.subscription_plan || '');
   const expires = profile.subscription_expires;
   const daysLeft = !hasSub ? 0 : expires ? Math.max(0, Math.ceil((new Date(expires).getTime() - Date.now()) / 86400000)) : 0;
 
@@ -170,14 +169,14 @@ function PanelView({ onBuy, planName, isLifetime }: { onBuy: () => void; planNam
             <Clock size={18} className="text-blue-400" />
           </div>
           <div className="text-sm text-zinc-500">Qolgan kunlar</div>
-          <div className="text-lg font-semibold text-white mt-1">{life ? 'Cheksiz' : hasSub ? `${daysLeft} kun` : '—'}</div>
+          <div className="text-lg font-semibold text-white mt-1">{hasSub ? `${daysLeft} kun` : '—'}</div>
         </Card>
         <Card className="p-6">
           <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-3">
             <Calendar size={18} className="text-amber-400" />
           </div>
           <div className="text-sm text-zinc-500">Tugash sanasi</div>
-          <div className="text-lg font-semibold text-white mt-1">{life ? 'Cheksiz' : hasSub ? expires : '—'}</div>
+          <div className="text-lg font-semibold text-white mt-1">{hasSub ? expires : '—'}</div>
         </Card>
       </div>
 
@@ -274,6 +273,19 @@ function PanelView({ onBuy, planName, isLifetime }: { onBuy: () => void; planNam
 
 // ============ PRICING ============
 function PricingView({ onBuy, plans }: { onBuy: (code: string) => void; plans: Plan[] }) {
+  const { profile, refreshProfile } = useAuth();
+  const [hwidLoading, setHwidLoading] = useState(false);
+
+  const resetHwid = async () => {
+    if (!profile?.hwid) return;
+    if (!window.confirm('Eski HWID tozalanadi. Keyingi modga kirishda yangi kompyuter avtomatik bog‘lanadi. Davom etasizmi?')) return;
+    setHwidLoading(true);
+    const { error } = await supabase.from('profiles').update({ hwid: null }).eq('id', profile.id);
+    setHwidLoading(false);
+    if (error) { alert('Xatolik: ' + error.message); return; }
+    await refreshProfile();
+  };
+
   const longest = plans.filter((p) => p.duration_days > 0).reduce((a, b) => (b.duration_days > a.duration_days ? b : a), plans[0]);
   return (
     <div>
@@ -290,7 +302,7 @@ function PricingView({ onBuy, plans }: { onBuy: (code: string) => void; plans: P
               )}
               <h3 className="text-lg font-bold text-white">{plan.name}</h3>
               <div className="mt-2 text-2xl font-extrabold text-white">{formatPrice(plan.price)}</div>
-              <div className="mt-1 text-sm text-zinc-500">{plan.duration_days > 0 ? `${plan.duration_days} kun` : 'Cheksiz'}</div>
+              <div className="mt-1 text-sm text-zinc-500">{plan.duration_days} kun</div>
               <ul className="mt-5 space-y-2.5 flex-1">
                 {['Barcha xususiyatlarga to‘liq ruxsat', 'Barcha visual funksiyalar', 'HWID himoya', '24/7 texnik yordam', 'Doimiy yangilanish'].map((feat) => (
                   <li key={feat} className="flex items-start gap-2 text-xs text-zinc-300">
@@ -302,6 +314,24 @@ function PricingView({ onBuy, plans }: { onBuy: (code: string) => void; plans: P
             </Card>
           );
         })}
+        <Card className="p-6 relative flex flex-col">
+          <div className="w-11 h-11 rounded-xl bg-[#ffffff]/10 border border-[#ffffff]/20 flex items-center justify-center mb-4">
+            <RefreshCw size={20} className="text-[#ffffff]" />
+          </div>
+          <h3 className="text-lg font-bold text-white">HWID yangilash</h3>
+          <p className="mt-1 text-sm text-zinc-500">Kompyuter almashtirildimi?</p>
+          <p className="mt-5 flex-1 text-xs text-zinc-400 leading-relaxed">
+            Eski kompyuterga bog‘langan HWIDni tozalang — keyingi modga kirishda yangi qurilma avtomatik bog‘lanadi.
+          </p>
+          {profile?.hwid && (
+            <div className="mt-4 px-3 py-2 rounded-lg bg-[#ffffff]/5 border border-[#ffffff]/10 font-mono text-[10px] text-zinc-400 break-all">
+              {profile.hwid}
+            </div>
+          )}
+          <Button variant="secondary" className="mt-5 w-full" onClick={resetHwid} disabled={hwidLoading || !profile?.hwid}>
+            {hwidLoading ? <Spinner /> : <><RefreshCw size={14} /> HWID yangilash</>}
+          </Button>
+        </Card>
       </div>
     </div>
   );
