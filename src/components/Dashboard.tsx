@@ -1,15 +1,15 @@
 ﻿import { useState, useEffect } from 'react';
 import {
   Shield, CreditCard, KeyRound, Fingerprint, Clock, Calendar, Check, AlertCircle,
-  ArrowLeft, Upload, MessageCircle, Users, Gift, Cloud, Link2, Tag, X, Download,
-  Timer, Ticket, PartyPopper,
+  ArrowLeft, Upload, Users, Gift, Cloud, Link2, Tag, X, Download,
+  Timer, Ticket, PartyPopper, RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button, Card, Badge, Input, Spinner, CopyButton } from './ui';
 import { supabase } from '../lib/supabase';
 import { PLANS, formatPrice, planByCode } from '../lib/plans';
-import { TELEGRAM_SUPPORT, HUMO_CARD, HUMO_OWNER, SITE_DOMAIN, DOWNLOAD_URL, DOWNLOAD_VERSION } from '../lib/constants';
-import type { Payment } from '../lib/types';
+import { HUMO_CARD, HUMO_OWNER, SITE_DOMAIN, DOWNLOAD_URL, DOWNLOAD_VERSION } from '../lib/constants';
+import type { Plan, Payment } from '../lib/types';
 
 type DashView = 'panel' | 'pricing' | 'payment' | 'referral' | 'ecosystem' | 'bonus';
 
@@ -17,12 +17,24 @@ export function Dashboard({ initialView = 'panel' }: { initialView?: DashView })
   const { profile, signOut, refreshProfile } = useAuth();
   const [view, setView] = useState<DashView>(initialView);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [dbPlans, setDbPlans] = useState<Plan[] | null>(null);
 
   useEffect(() => {
     setView(initialView);
   }, [initialView]);
 
+  useEffect(() => {
+    supabase
+      .from('plans')
+      .select('*')
+      .order('price', { ascending: true })
+      .then(({ data }) => setDbPlans((data as Plan[]) || []));
+  }, []);
+
   if (!profile) return null;
+
+  const allPlans = dbPlans && dbPlans.length > 0 ? dbPlans : PLANS;
+  const planName = (code: string) => allPlans.find((p) => p.code === code)?.name;
 
   const openPayment = (code: string) => {
     setSelectedPlan(code);
@@ -33,7 +45,7 @@ export function Dashboard({ initialView = 'panel' }: { initialView?: DashView })
     return (
       <div className="pt-24 pb-20 px-5 max-w-6xl mx-auto">
         <h1 className="text-2xl font-bold text-white mb-8">Sotib olish</h1>
-        <PricingView onBuy={openPayment} />
+        <PricingView onBuy={openPayment} plans={allPlans} />
       </div>
     );
   }
@@ -41,7 +53,7 @@ export function Dashboard({ initialView = 'panel' }: { initialView?: DashView })
   if (view === 'payment' && selectedPlan) {
     return (
       <div className="pt-24 pb-20 px-5 max-w-6xl mx-auto">
-        <PaymentView planCode={selectedPlan} onBack={() => setView('pricing')} onPaid={refreshProfile} />
+        <PaymentView planCode={selectedPlan} onBack={() => setView('pricing')} onPaid={refreshProfile} plans={allPlans} />
       </div>
     );
   }
@@ -82,7 +94,7 @@ export function Dashboard({ initialView = 'panel' }: { initialView?: DashView })
         ))}
       </div>
 
-      {view === 'panel' && <PanelView onBuy={() => setView('pricing')} />}
+      {view === 'panel' && <PanelView onBuy={() => setView('pricing')} planName={planName} isLifetime={(code) => allPlans.find((p) => p.code === code)?.duration_days === -1} />}
       {view === 'referral' && <ReferralView />}
       {view === 'ecosystem' && <EcosystemView />}
       {view === 'bonus' && <BonusView />}
@@ -91,11 +103,12 @@ export function Dashboard({ initialView = 'panel' }: { initialView?: DashView })
 }
 
 // ============ PANEL ============
-function PanelView({ onBuy }: { onBuy: () => void }) {
-  const { profile } = useAuth();
+function PanelView({ onBuy, planName, isLifetime }: { onBuy: () => void; planName: (code: string) => string | undefined; isLifetime: (code: string) => boolean }) {
+  const { profile, refreshProfile } = useAuth();
   const [keyInput, setKeyInput] = useState('');
   const [keyMsg, setKeyMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [keyLoading, setKeyLoading] = useState(false);
+  const [hwidLoading, setHwidLoading] = useState(false);
   const [payments, setPayments] = useState<Payment[]>([]);
 
   useEffect(() => {
@@ -111,8 +124,19 @@ function PanelView({ onBuy }: { onBuy: () => void }) {
   if (!profile) return null;
 
   const hasSub = !!profile.subscription_plan;
+  const life = hasSub && isLifetime(profile.subscription_plan || '');
   const expires = profile.subscription_expires;
   const daysLeft = !hasSub ? 0 : expires ? Math.max(0, Math.ceil((new Date(expires).getTime() - Date.now()) / 86400000)) : 0;
+
+  const resetHwid = async () => {
+    if (!profile.hwid) return;
+    if (!window.confirm('Eski HWID tozalanadi. Keyingi modga kirishda yangi kompyuter avtomatik bog‘lanadi. Davom etasizmi?')) return;
+    setHwidLoading(true);
+    const { error } = await supabase.from('profiles').update({ hwid: null }).eq('id', profile.id);
+    setHwidLoading(false);
+    if (error) { setKeyMsg({ type: 'err', text: 'Xatolik: ' + error.message }); return; }
+    await refreshProfile();
+  };
 
   const activateKey = async () => {
     if (!keyInput.trim()) { setKeyMsg({ type: 'err', text: 'Kalit kodini kiriting' }); return; }
@@ -139,21 +163,21 @@ function PanelView({ onBuy }: { onBuy: () => void }) {
             {hasSub ? <Badge color="gold"><Check size={12} /> Faol</Badge> : <Badge color="red">Obuna yo‘q</Badge>}
           </div>
           <div className="text-sm text-zinc-500">Obuna holati</div>
-          <div className="text-lg font-semibold text-white mt-1">{hasSub ? planByCode(profile.subscription_plan || '')?.name || profile.subscription_plan : 'Faol emas'}</div>
+          <div className="text-lg font-semibold text-white mt-1">{hasSub ? planName(profile.subscription_plan || '') || profile.subscription_plan : 'Faol emas'}</div>
         </Card>
         <Card className="p-6">
           <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-3">
             <Clock size={18} className="text-blue-400" />
           </div>
           <div className="text-sm text-zinc-500">Qolgan kunlar</div>
-          <div className="text-lg font-semibold text-white mt-1">{hasSub ? `${daysLeft} kun` : '—'}</div>
+          <div className="text-lg font-semibold text-white mt-1">{life ? 'Cheksiz' : hasSub ? `${daysLeft} kun` : '—'}</div>
         </Card>
         <Card className="p-6">
           <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mb-3">
             <Calendar size={18} className="text-amber-400" />
           </div>
           <div className="text-sm text-zinc-500">Tugash sanasi</div>
-          <div className="text-lg font-semibold text-white mt-1">{hasSub ? expires : '—'}</div>
+          <div className="text-lg font-semibold text-white mt-1">{life ? 'Cheksiz' : hasSub ? expires : '—'}</div>
         </Card>
       </div>
 
@@ -189,9 +213,19 @@ function PanelView({ onBuy }: { onBuy: () => void }) {
           Obunangiz avtomatik tarzda moddan birinchi kirgan kompyuteringizga bog‘lanadi.
           HWID kodni Panel bo‘limida ko‘rishingiz mumkin.
         </p>
-        <div className="px-4 py-3 rounded-xl bg-[#ffffff]/5 border border-[#ffffff]/10 font-mono text-sm text-white">
+        <div className="px-4 py-3 rounded-xl bg-[#ffffff]/5 border border-[#ffffff]/10 font-mono text-sm text-white break-all">
           {profile.hwid || 'Hali bog‘lanmagan — modga kiring'}
         </div>
+        {profile.hwid && (
+          <Button variant="secondary" size="sm" className="mt-3" onClick={resetHwid} disabled={hwidLoading}>
+            {hwidLoading ? <Spinner /> : <><RefreshCw size={14} /> HWID yangilash</>}
+          </Button>
+        )}
+        {keyMsg && keyMsg.type === 'err' && (
+          <p className="mt-3 text-sm text-red-400 flex items-center gap-1.5">
+            <AlertCircle size={14} />{keyMsg.text}
+          </p>
+        )}
       </Card>
 
       <Card className="p-6">
@@ -220,7 +254,7 @@ function PanelView({ onBuy }: { onBuy: () => void }) {
             {payments.map((p) => (
               <div key={p.id} className="flex items-center justify-between py-3 px-4 rounded-xl bg-white/[0.03] border border-white/5">
                 <div>
-                  <div className="text-sm text-white">{planByCode(p.plan_code)?.name || p.plan_code}</div>
+                  <div className="text-sm text-white">{planName(p.plan_code) || p.plan_code}</div>
                   <div className="text-xs text-zinc-500">{new Date(p.created_at).toLocaleDateString('uz-UZ')}</div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -239,23 +273,24 @@ function PanelView({ onBuy }: { onBuy: () => void }) {
 }
 
 // ============ PRICING ============
-function PricingView({ onBuy }: { onBuy: (code: string) => void }) {
+function PricingView({ onBuy, plans }: { onBuy: (code: string) => void; plans: Plan[] }) {
+  const longest = plans.filter((p) => p.duration_days > 0).reduce((a, b) => (b.duration_days > a.duration_days ? b : a), plans[0]);
   return (
     <div>
       <p className="text-zinc-500 mb-8">O‘zingizga mos rejani tanlang va obuna bo‘ling.</p>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {PLANS.map((plan) => {
-          const longest = plan.code === '180days';
+        {plans.map((plan) => {
+          const isLongest = plans.length > 0 && longest && plan.code === longest.code;
           return (
-            <Card key={plan.code} className={`p-6 relative flex flex-col ${longest ? 'border-[#ffffff]/30 shadow-[0_0_40px_rgba(255,255,255,0.12)]' : ''}`}>
-              {longest && (
+            <Card key={plan.code} className={`p-6 relative flex flex-col ${isLongest ? 'border-[#ffffff]/30 shadow-[0_0_40px_rgba(255,255,255,0.12)]' : ''}`}>
+              {isLongest && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                   <Badge color="gold"><Check size={12} /> Eng uzoq muddat</Badge>
                 </div>
               )}
               <h3 className="text-lg font-bold text-white">{plan.name}</h3>
               <div className="mt-2 text-2xl font-extrabold text-white">{formatPrice(plan.price)}</div>
-              <div className="mt-1 text-sm text-zinc-500">{plan.duration_days} kun</div>
+              <div className="mt-1 text-sm text-zinc-500">{plan.duration_days > 0 ? `${plan.duration_days} kun` : 'Cheksiz'}</div>
               <ul className="mt-5 space-y-2.5 flex-1">
                 {['Barcha xususiyatlarga to‘liq ruxsat', 'Barcha visual funksiyalar', 'HWID himoya', '24/7 texnik yordam', 'Doimiy yangilanish'].map((feat) => (
                   <li key={feat} className="flex items-start gap-2 text-xs text-zinc-300">
@@ -263,7 +298,7 @@ function PricingView({ onBuy }: { onBuy: (code: string) => void }) {
                   </li>
                 ))}
               </ul>
-              <Button className="mt-5 w-full" variant={longest ? 'primary' : 'secondary'} onClick={() => onBuy(plan.code)}>Obuna bo‘lish</Button>
+              <Button className="mt-5 w-full" variant={isLongest ? 'primary' : 'secondary'} onClick={() => onBuy(plan.code)}>Obuna bo‘lish</Button>
             </Card>
           );
         })}
@@ -273,9 +308,9 @@ function PricingView({ onBuy }: { onBuy: (code: string) => void }) {
 }
 
 // ============ PAYMENT ============
-function PaymentView({ planCode, onBack, onPaid }: { planCode: string; onBack: () => void; onPaid: () => Promise<void> }) {
+function PaymentView({ planCode, onBack, onPaid, plans }: { planCode: string; onBack: () => void; onPaid: () => Promise<void>; plans: Plan[] }) {
   const { profile } = useAuth();
-  const plan = planByCode(planCode)!;
+  const plan = plans.find((p) => p.code === planCode) || planByCode(planCode)!;
   const [receipt, setReceipt] = useState<File | null>(null);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -372,9 +407,6 @@ function PaymentView({ planCode, onBack, onPaid }: { planCode: string; onBack: (
                 {promoData && <div className="text-xs text-[#ffffff] mt-1">Chegirma: {promoData.discount_percent}%</div>}
               </div>
             </div>
-            <a href={TELEGRAM_SUPPORT} target="_blank" rel="noreferrer" className="block mt-5">
-              <Button variant="blue" className="w-full"><MessageCircle size={16} /> Telegram lichkaga o‘tish</Button>
-            </a>
           </Card>
 
           <Card className="p-6">

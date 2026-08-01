@@ -3,7 +3,7 @@ import { Shield, Search, KeyRound, Users, CreditCard, Check, X, Ban, ShieldCheck
 import { useAuth } from '../context/AuthContext';
 import { Card, Badge, Input, Spinner, Button } from './ui';
 import { supabase } from '../lib/supabase';
-import { PLANS, formatPrice, planByCode } from '../lib/plans';
+import { getAllPlans, loadPlans, formatPrice, planByCode } from '../lib/plans';
 import type { LicenseKey, Payment, Profile, Plan, Promocode } from '../lib/types';
 
 type AdminTab = 'payments' | 'users' | 'plans' | 'promocodes';
@@ -11,6 +11,11 @@ type AdminTab = 'payments' | 'users' | 'plans' | 'promocodes';
 export function Admin() {
   const { profile } = useAuth();
   const [tab, setTab] = useState<AdminTab>('payments');
+  const [, forceRender] = useState(0);
+
+  useEffect(() => {
+    loadPlans().then(() => forceRender((x) => x + 1));
+  }, []);
 
   if (!profile || profile.role !== 'admin') {
     return <div className="pt-32 px-5 text-center"><p className="text-zinc-400">Sizda admin huquqlari yo‘q.</p></div>;
@@ -226,7 +231,7 @@ function UsersTab() {
                   onChange={(e) => setGrantPlan(e.target.value)}
                   className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-gray-100 text-sm outline-none transition-all focus:border-[#ffffff]/50"
                 >
-                  {PLANS.map((p) => (
+                  {getAllPlans().map((p) => (
                     <option key={p.code} value={p.code} className="bg-black text-gray-100">{p.name} — {formatPrice(p.price)}</option>
                   ))}
                 </select>
@@ -406,7 +411,7 @@ function PromocodesTab() {
                   onChange={(e) => setKeyPlan(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-100 outline-none transition-all focus:border-[#ffffff]/50 focus:bg-white/[0.07]"
                 >
-                  {PLANS.map((p) => (
+                  {getAllPlans().map((p) => (
                     <option key={p.code} value={p.code} className="bg-black text-gray-100">{p.name} — {formatPrice(p.price)}</option>
                   ))}
                 </select>
