@@ -7,15 +7,13 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,8 +24,21 @@ jobs:
       - run: npm ci
       - run: cp .env.example .env
       - run: npm run build
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-      - uses: actions/deploy-pages@v4
+      - name: Push dist to MixerVisualsUz.github.io
+        env:
+          PAGES_PAT: ${{ secrets.PAGES_PAT }}
+        run: |
+          set -e
+          rm -rf /tmp/pages
+          git clone --depth 1 "https://x-access-token:${PAGES_PAT}@github.com/MixerVisualsUz/MixerVisualsUz.github.io.git" /tmp/pages
+          cd /tmp/pages
+          git rm -rf --quiet . 2>/dev/null || true
+          cp -r "$GITHUB_WORKSPACE/dist/." .
+          touch .nojekyll
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes, skip"
+          else
+            git -c user.name="Deploy Bot" -c user.email="deploy@mixervisuals.uz" commit -m "Deploy site"
+            git push origin HEAD:main
+          fi
