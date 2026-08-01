@@ -48,12 +48,6 @@ const faqs = [
   { q: 'Qaysi paketni tanlashim kerak?', a: '180 kunlik paket eng foydali — eng uzoq muddat va eng yaxshi narx. Boshlang‘ich uchun 30 kunlik tavsiya etiladi.' },
 ];
 
-const changelog = [
-  { version: 'v2.4.0', date: '28.07.2026', changes: ['Yangi shader paketlari qo‘shildi', 'FPS optimizatsiyasi yaxshilandi', 'HWID tizimi yangilandi'] },
-  { version: 'v2.3.0', date: '15.07.2026', changes: ['Skybox sozlamalari qo‘shildi', 'Promokod tizimi ishga tushdi', 'Bir nechta xato tuzatildi'] },
-  { version: 'v2.2.0', date: '01.07.2026', changes: ['FOV boshqaruvi qo‘shildi', 'Zoom funksiyasi yangilandi', 'UI yangilandi'] },
-];
-
 export function Landing({ onKabinet }: { onKabinet: () => void }) {
   const { navigate } = useNav();
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -231,35 +225,6 @@ export function Landing({ onKabinet }: { onKabinet: () => void }) {
                 </div>
                 <span className="text-white font-medium">{t.name}</span>
               </div>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      {/* CHANGELOG */}
-      <section className="px-5 py-20 max-w-4xl mx-auto">
-        <div className="text-center mb-12">
-          <Badge color="gold"><RefreshCw size={12} /> Yangilanishlar</Badge>
-          <h2 className="mt-4 text-3xl sm:text-5xl font-bold text-white">O‘zgarishlar tarixi</h2>
-        </div>
-        <div className="space-y-4">
-          {changelog.map((log, i) => (
-            <Card key={log.version} className={`p-6 animate-[slideInLeft_0.5s_ease-out_${i * 100}ms_both]`}>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <span className="px-3 py-1 rounded-lg bg-[#ffffff]/15 text-[#ffffff] text-sm font-mono font-medium border border-[#ffffff]/25">
-                    {log.version}
-                  </span>
-                  <span className="text-sm text-zinc-500">{log.date}</span>
-                </div>
-              </div>
-              <ul className="space-y-2">
-                {log.changes.map((c, j) => (
-                  <li key={j} className="flex items-start gap-2 text-sm text-zinc-300">
-                    <Check size={14} className="text-[#ffffff] mt-0.5 shrink-0" /> {c}
-                  </li>
-                ))}
-              </ul>
             </Card>
           ))}
         </div>
