@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useRef } from 'react';
-import { X, Mail, Lock, User, AlertCircle } from 'lucide-react';
+import { X, Mail, Lock, User, AlertCircle, ShieldCheck, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNav } from '../context/NavContext';
 import { Button, Input, Spinner } from './ui';
@@ -30,13 +30,23 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [regForm, setRegForm] = useState({ username: '', email: '', password: '' });
   const [honeypot, setHoneypot] = useState('');
+  const [captchaA, setCaptchaA] = useState(0);
+  const [captchaB, setCaptchaB] = useState(0);
+  const [captchaInput, setCaptchaInput] = useState('');
   const openedAt = useRef(0);
+
+  const genCaptcha = () => {
+    setCaptchaA(Math.floor(Math.random() * 9) + 3);
+    setCaptchaB(Math.floor(Math.random() * 9) + 1);
+    setCaptchaInput('');
+  };
 
   useEffect(() => {
     if (open) {
       setError('');
       setTab('login');
       openedAt.current = Date.now();
+      genCaptcha();
     }
   }, [open]);
 
@@ -72,6 +82,20 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
     }
   };
 
+  // Captcha tekshiruvi
+  const captchaCheck = (): boolean => {
+    if (!captchaInput.trim()) {
+      setError('Captcha javobini kiriting');
+      return false;
+    }
+    if (parseInt(captchaInput, 10) !== captchaA + captchaB) {
+      setError('Captcha noto‘g‘ri. Yangi misol yaratildi, qaytadan urinib ko‘ring');
+      genCaptcha();
+      return false;
+    }
+    return true;
+  };
+
   const submitLogin = async () => {
     if (!loginForm.email || !loginForm.password) {
       setError('Barcha maydonlarni to‘ldiring');
@@ -81,6 +105,7 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
     if (check === 'robot') return;
     if (check === 'too-fast') { setError('Biroz kuting va qayta urinib ko‘ring'); return; }
     if (check === 'limited') { setError('Juda ko‘p urinish. Bir daqiqadan keyin qaytadan urinib ko‘ring'); return; }
+    if (!captchaCheck()) return;
     recordAttempt();
     setLoading(true);
     setError('');
@@ -88,6 +113,7 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
     setLoading(false);
     if (!res.success) {
       setError(res.message);
+      genCaptcha();
       return;
     }
     onClose();
@@ -107,6 +133,7 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
     if (check === 'robot') return;
     if (check === 'too-fast') { setError('Biroz kuting va qayta urinib ko‘ring'); return; }
     if (check === 'limited') { setError('Juda ko‘p urinish. Bir daqiqadan keyin qaytadan urinib ko‘ring'); return; }
+    if (!captchaCheck()) return;
     recordAttempt();
     setLoading(true);
     setError('');
@@ -115,10 +142,12 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
     setLoading(false);
     if (!res.success) {
       setError(res.message);
+      genCaptcha();
       return;
     }
     setTab('login');
     setLoginForm({ email: regForm.email, password: '' });
+    genCaptcha();
     setError('Ro‘yxatdan o‘tish muvaffaqiyatli. Endi tizimga kiring.');
   };
 
@@ -179,8 +208,7 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
             />
           </div>
 
-          {tab === 'login' ? (
-            <div className="space-y-4">
+          {tab === 'login' ? (            <div className="space-y-4">
               <div className="relative">
                 <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500" />
                 <Input
@@ -203,6 +231,7 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
                   onKeyDown={(e) => e.key === 'Enter' && submitLogin()}
                 />
               </div>
+              <CaptchaField a={captchaA} b={captchaB} value={captchaInput} onChange={setCaptchaInput} onRefresh={genCaptcha} onEnter={submitLogin} />
               <Button onClick={submitLogin} disabled={loading} size="lg" className="w-full">
                 {loading ? <Spinner /> : 'Tizimga kirish'}
               </Button>
@@ -240,12 +269,49 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
                   onKeyDown={(e) => e.key === 'Enter' && submitRegister()}
                 />
               </div>
+              <CaptchaField a={captchaA} b={captchaB} value={captchaInput} onChange={setCaptchaInput} onRefresh={genCaptcha} onEnter={submitRegister} />
               <Button onClick={submitRegister} disabled={loading} size="lg" className="w-full">
                 {loading ? <Spinner /> : 'Ro‘yxatdan o‘tish'}
               </Button>
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function CaptchaField({ a, b, value, onChange, onRefresh, onEnter }: {
+  a: number; b: number; value: string;
+  onChange: (v: string) => void; onRefresh: () => void; onEnter: () => void;
+}) {
+  return (
+    <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 text-xs text-zinc-400">
+          <ShieldCheck size={14} className="text-[#ffffff]" />
+          <span>Captcha — inson tekshiruvi</span>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          className="text-zinc-500 hover:text-white transition-colors"
+          title="Yangi misol"
+        >
+          <RefreshCw size={14} />
+        </button>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="font-mono text-lg font-bold text-white whitespace-nowrap">{a} + {b} = ?</span>
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onEnter()}
+          className="flex-1 font-mono text-center"
+          placeholder="?"
+          inputMode="numeric"
+          autoComplete="off"
+        />
       </div>
     </div>
   );
