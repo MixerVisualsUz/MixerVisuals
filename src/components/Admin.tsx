@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
-import { Shield, Search, KeyRound, Users, CreditCard, Check, X, Ban, ShieldCheck, Tag, Plus, Trash2, Fingerprint, Gift, Pencil } from 'lucide-react';
+import { Shield, Search, KeyRound, Users, CreditCard, Check, X, Ban, ShieldCheck, Tag, Plus, Trash2, Fingerprint, Gift, Pencil, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Badge, Input, Spinner, Button } from './ui';
 import { supabase } from '../lib/supabase';
@@ -72,9 +72,14 @@ function PaymentsTab() {
   useEffect(() => { load(); }, []);
 
   const approvePayment = async (p: PaymentRow) => {
+    await supabase.from('payments').update({ status: 'approved' }).eq('id', p.id);
+    if (p.plan_code === 'hwid_reset') {
+      await supabase.from('profiles').update({ hwid: null }).eq('id', p.user_id);
+      load();
+      return;
+    }
     const plan = planByCode(p.plan_code);
     if (!plan) return;
-    await supabase.from('payments').update({ status: 'approved' }).eq('id', p.id);
     const base = new Date();
     base.setDate(base.getDate() + plan.duration_days);
     const newExpires = base.toISOString().slice(0, 10);
@@ -94,7 +99,7 @@ function PaymentsTab() {
             <Card key={p.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex-1">
                 <div className="text-white text-sm">
-                  {planByCode(p.plan_code)?.name || p.plan_code} — {formatPrice(p.amount)}
+                  {planByCode(p.plan_code)?.name || (p.plan_code === 'hwid_reset' ? 'HWID yangilash' : p.plan_code)} — {formatPrice(p.amount)}
                 </div>
                 <div className="text-xs text-zinc-400 mt-1">
                   {p.profiles?.email || 'noma‘lum email'} {p.profiles?.username && <span className="text-zinc-500">({p.profiles.username})</span>}
@@ -258,13 +263,26 @@ function PlansTab() {
   const [editing, setEditing] = useState<string | null>(null);
   const [edit, setEdit] = useState({ name: '', price: '', duration_days: '' });
   const [msg, setMsg] = useState<string | null>(null);
+  const [hwidPrice, setHwidPrice] = useState('');
+  const [hwidMsg, setHwidMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
 
   const load = async () => {
     const { data } = await supabase.from('plans').select('*').order('price', { ascending: true });
     setPlans((data as Plan[]) || []);
     setLoading(false);
   };
-  useEffect(() => { load(); }, []);
+  const loadHwidPrice = async () => {
+    const { data } = await supabase.from('settings').select('value').eq('key', 'hwid_reset_price').single();
+    if (data?.value != null) setHwidPrice(String(data.value));
+  };
+  useEffect(() => { load(); loadHwidPrice(); }, []);
+
+  const saveHwidPrice = async () => {
+    const price = parseInt(hwidPrice);
+    if (isNaN(price) || price <= 0) { setHwidMsg({ type: 'err', text: 'Narxni to‘g‘ri kiriting' }); return; }
+    const { error } = await supabase.from('settings').update({ value: String(price) }).eq('key', 'hwid_reset_price');
+    setHwidMsg(error ? { type: 'err', text: 'Xatolik: ' + error.message } : { type: 'ok', text: 'Narx saqlandi' });
+  };
 
   const toggleActive = async (p: Plan) => { await supabase.from('plans').update({ active: !p.active }).eq('code', p.code); load(); };
 
@@ -292,6 +310,18 @@ function PlansTab() {
 
   return (
     <div className="space-y-2">
+      <Card className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-[#ffffff]/15">
+        <div>
+          <div className="text-white font-medium flex items-center gap-2"><RefreshCw size={16} className="text-[#ffffff]" /> HWID yangilash narxi</div>
+          <div className="text-xs text-zinc-500 mt-1">Foydalanuvchi HWIDni tozalash uchun to‘laydigan narx</div>
+        </div>
+        <div className="flex items-center gap-2">
+          <Input type="number" value={hwidPrice} onChange={(e) => setHwidPrice(e.target.value)} className="w-32" placeholder="10000" />
+          <Button size="sm" onClick={saveHwidPrice}><Check size={14} /> Saqlash</Button>
+        </div>
+        {hwidMsg && <p className={`text-xs sm:hidden ${hwidMsg.type === 'ok' ? 'text-[#ffffff]' : 'text-red-400'}`}>{hwidMsg.text}</p>}
+        {hwidMsg && <p className={`hidden sm:block text-xs ${hwidMsg.type === 'ok' ? 'text-[#ffffff]' : 'text-red-400'}`}>{hwidMsg.text}</p>}
+      </Card>
       {plans.map((p) => (
         <Card key={p.code} className="p-4">
           {editing === p.code ? (

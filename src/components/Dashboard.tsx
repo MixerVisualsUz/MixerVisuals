@@ -18,6 +18,7 @@ export function Dashboard({ initialView = 'panel' }: { initialView?: DashView })
   const [view, setView] = useState<DashView>(initialView);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [dbPlans, setDbPlans] = useState<Plan[] | null>(null);
+  const [hwidPrice, setHwidPrice] = useState(10000);
 
   useEffect(() => {
     setView(initialView);
@@ -29,11 +30,20 @@ export function Dashboard({ initialView = 'panel' }: { initialView?: DashView })
       .select('*')
       .order('price', { ascending: true })
       .then(({ data }) => setDbPlans((data as Plan[]) || []));
+    supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'hwid_reset_price')
+      .single()
+      .then(({ data }) => {
+        if (data?.value != null) setHwidPrice(Number(data.value));
+      });
   }, []);
 
   if (!profile) return null;
 
   const allPlans = dbPlans && dbPlans.length > 0 ? dbPlans : PLANS;
+  const hwidPlan: Plan = { code: 'hwid_reset', name: 'HWID yangilash', price: hwidPrice, duration_days: 1, active: true };
   const planName = (code: string) => allPlans.find((p) => p.code === code)?.name;
 
   const openPayment = (code: string) => {
@@ -45,15 +55,17 @@ export function Dashboard({ initialView = 'panel' }: { initialView?: DashView })
     return (
       <div className="pt-24 pb-20 px-5 max-w-6xl mx-auto">
         <h1 className="text-2xl font-bold text-white mb-8">Sotib olish</h1>
-        <PricingView onBuy={openPayment} plans={allPlans} />
+        <PricingView onBuy={openPayment} plans={allPlans} hwidPrice={hwidPrice} />
       </div>
     );
   }
 
   if (view === 'payment' && selectedPlan) {
+    const plan = allPlans.find((p) => p.code === selectedPlan) || planByCode(selectedPlan) || (selectedPlan === 'hwid_reset' ? hwidPlan : undefined);
+    if (!plan) return null;
     return (
       <div className="pt-24 pb-20 px-5 max-w-6xl mx-auto">
-        <PaymentView planCode={selectedPlan} onBack={() => setView('pricing')} onPaid={refreshProfile} plans={allPlans} />
+        <PaymentView plan={plan} onBack={() => setView('pricing')} onPaid={refreshProfile} />
       </div>
     );
   }
@@ -94,7 +106,7 @@ export function Dashboard({ initialView = 'panel' }: { initialView?: DashView })
         ))}
       </div>
 
-      {view === 'panel' && <PanelView onBuy={() => setView('pricing')} planName={planName} />}
+      {view === 'panel' && <PanelView onBuy={() => setView('pricing')} onBuyHwid={() => { setSelectedPlan('hwid_reset'); setView('payment'); }} planName={planName} />}
       {view === 'referral' && <ReferralView />}
       {view === 'ecosystem' && <EcosystemView />}
       {view === 'bonus' && <BonusView />}
@@ -103,12 +115,11 @@ export function Dashboard({ initialView = 'panel' }: { initialView?: DashView })
 }
 
 // ============ PANEL ============
-function PanelView({ onBuy, planName }: { onBuy: () => void; planName: (code: string) => string | undefined }) {
-  const { profile, refreshProfile } = useAuth();
+function PanelView({ onBuy, onBuyHwid, planName }: { onBuy: () => void; onBuyHwid: () => void; planName: (code: string) => string | undefined }) {
+  const { profile } = useAuth();
   const [keyInput, setKeyInput] = useState('');
   const [keyMsg, setKeyMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
   const [keyLoading, setKeyLoading] = useState(false);
-  const [hwidLoading, setHwidLoading] = useState(false);
   const [payments, setPayments] = useState<Payment[]>([]);
 
   useEffect(() => {
@@ -126,16 +137,6 @@ function PanelView({ onBuy, planName }: { onBuy: () => void; planName: (code: st
   const hasSub = !!profile.subscription_plan;
   const expires = profile.subscription_expires;
   const daysLeft = !hasSub ? 0 : expires ? Math.max(0, Math.ceil((new Date(expires).getTime() - Date.now()) / 86400000)) : 0;
-
-  const resetHwid = async () => {
-    if (!profile.hwid) return;
-    if (!window.confirm('Eski HWID tozalanadi. Keyingi modga kirishda yangi kompyuter avtomatik bog‘lanadi. Davom etasizmi?')) return;
-    setHwidLoading(true);
-    const { error } = await supabase.from('profiles').update({ hwid: null }).eq('id', profile.id);
-    setHwidLoading(false);
-    if (error) { setKeyMsg({ type: 'err', text: 'Xatolik: ' + error.message }); return; }
-    await refreshProfile();
-  };
 
   const activateKey = async () => {
     if (!keyInput.trim()) { setKeyMsg({ type: 'err', text: 'Kalit kodini kiriting' }); return; }
@@ -210,20 +211,15 @@ function PanelView({ onBuy, planName }: { onBuy: () => void; planName: (code: st
         </div>
         <p className="text-sm text-zinc-400 mb-2">
           Obunangiz avtomatik tarzda moddan birinchi kirgan kompyuteringizga bog‘lanadi.
-          HWID kodni Panel bo‘limida ko‘rishingiz mumkin.
+          Kompyuter almashtirsangiz, HWIDni pullik yangilash mumkin.
         </p>
         <div className="px-4 py-3 rounded-xl bg-[#ffffff]/5 border border-[#ffffff]/10 font-mono text-sm text-white break-all">
           {profile.hwid || 'Hali bog‘lanmagan — modga kiring'}
         </div>
         {profile.hwid && (
-          <Button variant="secondary" size="sm" className="mt-3" onClick={resetHwid} disabled={hwidLoading}>
-            {hwidLoading ? <Spinner /> : <><RefreshCw size={14} /> HWID yangilash</>}
+          <Button variant="secondary" size="sm" className="mt-3" onClick={onBuyHwid}>
+            <RefreshCw size={14} /> HWID yangilash
           </Button>
-        )}
-        {keyMsg && keyMsg.type === 'err' && (
-          <p className="mt-3 text-sm text-red-400 flex items-center gap-1.5">
-            <AlertCircle size={14} />{keyMsg.text}
-          </p>
         )}
       </Card>
 
@@ -272,20 +268,7 @@ function PanelView({ onBuy, planName }: { onBuy: () => void; planName: (code: st
 }
 
 // ============ PRICING ============
-function PricingView({ onBuy, plans }: { onBuy: (code: string) => void; plans: Plan[] }) {
-  const { profile, refreshProfile } = useAuth();
-  const [hwidLoading, setHwidLoading] = useState(false);
-
-  const resetHwid = async () => {
-    if (!profile?.hwid) return;
-    if (!window.confirm('Eski HWID tozalanadi. Keyingi modga kirishda yangi kompyuter avtomatik bog‘lanadi. Davom etasizmi?')) return;
-    setHwidLoading(true);
-    const { error } = await supabase.from('profiles').update({ hwid: null }).eq('id', profile.id);
-    setHwidLoading(false);
-    if (error) { alert('Xatolik: ' + error.message); return; }
-    await refreshProfile();
-  };
-
+function PricingView({ onBuy, plans, hwidPrice }: { onBuy: (code: string) => void; plans: Plan[]; hwidPrice: number }) {
   const longest = plans.filter((p) => p.duration_days > 0).reduce((a, b) => (b.duration_days > a.duration_days ? b : a), plans[0]);
   return (
     <div>
@@ -319,17 +302,13 @@ function PricingView({ onBuy, plans }: { onBuy: (code: string) => void; plans: P
             <RefreshCw size={20} className="text-[#ffffff]" />
           </div>
           <h3 className="text-lg font-bold text-white">HWID yangilash</h3>
-          <p className="mt-1 text-sm text-zinc-500">Kompyuter almashtirildimi?</p>
+          <div className="mt-2 text-2xl font-extrabold text-white">{formatPrice(hwidPrice)}</div>
+          <div className="mt-1 text-sm text-zinc-500">Bir martalik to‘lov</div>
           <p className="mt-5 flex-1 text-xs text-zinc-400 leading-relaxed">
-            Eski kompyuterga bog‘langan HWIDni tozalang — keyingi modga kirishda yangi qurilma avtomatik bog‘lanadi.
+            Eski kompyuterga bog‘langan HWID tozalanadi. To‘lov admin tasdiqlangach yangi qurilma bog‘lash mumkin bo‘ladi.
           </p>
-          {profile?.hwid && (
-            <div className="mt-4 px-3 py-2 rounded-lg bg-[#ffffff]/5 border border-[#ffffff]/10 font-mono text-[10px] text-zinc-400 break-all">
-              {profile.hwid}
-            </div>
-          )}
-          <Button variant="secondary" className="mt-5 w-full" onClick={resetHwid} disabled={hwidLoading || !profile?.hwid}>
-            {hwidLoading ? <Spinner /> : <><RefreshCw size={14} /> HWID yangilash</>}
+          <Button variant="secondary" className="mt-5 w-full" onClick={() => onBuy('hwid_reset')}>
+            <RefreshCw size={14} /> HWID yangilash
           </Button>
         </Card>
       </div>
@@ -338,9 +317,8 @@ function PricingView({ onBuy, plans }: { onBuy: (code: string) => void; plans: P
 }
 
 // ============ PAYMENT ============
-function PaymentView({ planCode, onBack, onPaid, plans }: { planCode: string; onBack: () => void; onPaid: () => Promise<void>; plans: Plan[] }) {
+function PaymentView({ plan, onBack, onPaid }: { plan: Plan; onBack: () => void; onPaid: () => Promise<void> }) {
   const { profile } = useAuth();
-  const plan = plans.find((p) => p.code === planCode) || planByCode(planCode)!;
   const [receipt, setReceipt] = useState<File | null>(null);
   const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
