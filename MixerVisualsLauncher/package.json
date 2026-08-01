@@ -5,7 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build": "electron-builder --win portable",
+    "build": "node scripts/obfuscate.mjs && electron-builder --win portable && node scripts/restore.mjs",
     "build:mod": "cd mod && .\\gradlew.bat build",
     "build:all": "npm run build:mod && npm run build"
   },
@@ -42,6 +42,7 @@
     "electron": "^43.2.0",
     "electron-builder": "^24.0.0",
     "electron-packager": "^17.1.2",
+    "javascript-obfuscator": "^5.5.0",
     "png-to-ico": "^3.0.2"
   },
   "dependencies": {
