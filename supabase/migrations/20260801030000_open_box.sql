@@ -19,8 +19,8 @@ DECLARE
   v_code text;
   v_exp date;
 BEGIN
-  -- Kuniga 1 marta cheklovi
-  IF EXISTS (
+  -- Kuniga 1 marta cheklovi (admin'lar uchun cheksiz)
+  IF NOT public.is_admin() AND EXISTS (
     SELECT 1 FROM public.profiles
     WHERE id = auth.uid()
       AND last_box_open > now() - interval '24 hours'
