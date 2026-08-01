@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useRef } from 'react';
-import { X, Mail, Lock, User, AlertCircle, ShieldCheck, RefreshCw } from 'lucide-react';
+import { X, Mail, Lock, User, AlertCircle, ShieldCheck, RefreshCw, Check } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNav } from '../context/NavContext';
 import { Button, Input, Spinner } from './ui';
@@ -32,18 +32,30 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
   const [captchaA, setCaptchaA] = useState(0);
   const [captchaB, setCaptchaB] = useState(0);
   const [captchaInput, setCaptchaInput] = useState('');
+  const [captchaVerified, setCaptchaVerified] = useState(false);
+  const [captchaPopup, setCaptchaPopup] = useState(false);
+  const [captchaLoading, setCaptchaLoading] = useState(false);
+  const [captchaErr, setCaptchaErr] = useState('');
 
   const genCaptcha = () => {
     setCaptchaA(Math.floor(Math.random() * 9) + 3);
     setCaptchaB(Math.floor(Math.random() * 9) + 1);
     setCaptchaInput('');
+    setCaptchaErr('');
+  };
+
+  const resetCaptcha = () => {
+    setCaptchaVerified(false);
+    setCaptchaPopup(false);
+    setCaptchaLoading(false);
+    genCaptcha();
   };
 
   useEffect(() => {
     if (open) {
       setError('');
       setTab('login');
-      genCaptcha();
+      resetCaptcha();
     }
   }, [open]);
 
@@ -78,18 +90,27 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
     }
   };
 
-  // Captcha tekshiruvi
-  const captchaCheck = (): boolean => {
-    if (!captchaInput.trim()) {
-      setError('Captcha javobini kiriting');
-      return false;
-    }
-    if (parseInt(captchaInput, 10) !== captchaA + captchaB) {
-      setError('Captcha noto‘g‘ri. Yangi misol yaratildi, qaytadan urinib ko‘ring');
+  // Captcha: checkbox bosilganda oyna ochiladi
+  const startCaptcha = () => {
+    if (captchaVerified || captchaLoading) return;
+    setCaptchaLoading(true);
+    setTimeout(() => {
+      setCaptchaLoading(false);
       genCaptcha();
-      return false;
+      setCaptchaPopup(true);
+    }, 600);
+  };
+
+  const confirmCaptcha = () => {
+    if (!captchaInput.trim()) { setCaptchaErr('Javobni kiriting'); return; }
+    if (parseInt(captchaInput, 10) !== captchaA + captchaB) {
+      setCaptchaErr('Noto‘g‘ri javob. Yangi misol yaratildi');
+      genCaptcha();
+      return;
     }
-    return true;
+    setCaptchaVerified(true);
+    setCaptchaPopup(false);
+    setError('');
   };
 
   const submitLogin = async () => {
@@ -99,9 +120,8 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
     }
     const check = antiBotCheck();
     if (check === 'robot') return;
-    if (check === 'too-fast') { setError('Biroz kuting va qayta urinib ko‘ring'); return; }
     if (check === 'limited') { setError('Juda ko‘p urinish. Bir daqiqadan keyin qaytadan urinib ko‘ring'); return; }
-    if (!captchaCheck()) return;
+    if (!captchaVerified) { setError('Avval captchani tasdiqlang'); return; }
     recordAttempt();
     setLoading(true);
     setError('');
@@ -109,7 +129,7 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
     setLoading(false);
     if (!res.success) {
       setError(res.message);
-      genCaptcha();
+      resetCaptcha();
       return;
     }
     onClose();
@@ -127,9 +147,8 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
     }
     const check = antiBotCheck();
     if (check === 'robot') return;
-    if (check === 'too-fast') { setError('Biroz kuting va qayta urinib ko‘ring'); return; }
     if (check === 'limited') { setError('Juda ko‘p urinish. Bir daqiqadan keyin qaytadan urinib ko‘ring'); return; }
-    if (!captchaCheck()) return;
+    if (!captchaVerified) { setError('Avval captchani tasdiqlang'); return; }
     recordAttempt();
     setLoading(true);
     setError('');
@@ -138,12 +157,12 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
     setLoading(false);
     if (!res.success) {
       setError(res.message);
-      genCaptcha();
+      resetCaptcha();
       return;
     }
     setTab('login');
     setLoginForm({ email: regForm.email, password: '' });
-    genCaptcha();
+    resetCaptcha();
     setError('Ro‘yxatdan o‘tish muvaffaqiyatli. Endi tizimga kiring.');
   };
 
@@ -227,8 +246,8 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
                   onKeyDown={(e) => e.key === 'Enter' && submitLogin()}
                 />
               </div>
-              <CaptchaField a={captchaA} b={captchaB} value={captchaInput} onChange={setCaptchaInput} onRefresh={genCaptcha} onEnter={submitLogin} />
-              <Button onClick={submitLogin} disabled={loading} size="lg" className="w-full">
+              <RecaptchaBox verified={captchaVerified} loading={captchaLoading} onCheck={startCaptcha} />
+              <Button onClick={submitLogin} disabled={loading || !captchaVerified} size="lg" className="w-full">
                 {loading ? <Spinner /> : 'Tizimga kirish'}
               </Button>
             </div>
@@ -265,50 +284,96 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
                   onKeyDown={(e) => e.key === 'Enter' && submitRegister()}
                 />
               </div>
-              <CaptchaField a={captchaA} b={captchaB} value={captchaInput} onChange={setCaptchaInput} onRefresh={genCaptcha} onEnter={submitRegister} />
-              <Button onClick={submitRegister} disabled={loading} size="lg" className="w-full">
+              <RecaptchaBox verified={captchaVerified} loading={captchaLoading} onCheck={startCaptcha} />
+              <Button onClick={submitRegister} disabled={loading || !captchaVerified} size="lg" className="w-full">
                 {loading ? <Spinner /> : 'Ro‘yxatdan o‘tish'}
               </Button>
             </div>
           )}
         </div>
       </div>
+
+      {/* Captcha oynasi */}
+      {captchaPopup && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm animate-[fadeIn_0.15s_ease-out]" onClick={() => setCaptchaPopup(false)} />
+          <div className="relative w-full max-w-xs animate-[scaleIn_0.25s_cubic-bezier(0.34,1.56,0.64,1)]">
+            <div className="rounded-2xl bg-zinc-900 border border-zinc-700 p-5 shadow-2xl">
+              <div className="flex items-center gap-2 mb-3">
+                <ShieldCheck size={18} className="text-[#ffffff]" />
+                <h3 className="text-sm font-semibold text-white">Inson tekshiruvi</h3>
+                <button
+                  onClick={genCaptcha}
+                  className="ml-auto text-zinc-500 hover:text-white transition-colors"
+                  title="Yangi misol"
+                >
+                  <RefreshCw size={14} />
+                </button>
+              </div>
+              <p className="text-sm text-zinc-300 mb-3">Quyidagi misolni yeching:</p>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="font-mono text-lg font-bold text-white whitespace-nowrap">{captchaA} + {captchaB} = ?</span>
+                <Input
+                  value={captchaInput}
+                  onChange={(e) => setCaptchaInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && confirmCaptcha()}
+                  className="flex-1 font-mono text-center"
+                  placeholder="?"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  autoFocus
+                />
+              </div>
+              {captchaErr && (
+                <p className="mb-3 text-xs text-red-400 flex items-center gap-1.5">
+                  <AlertCircle size={13} /> {captchaErr}
+                </p>
+              )}
+              <Button onClick={confirmCaptcha} size="sm" className="w-full">Tasdiqlash</Button>
+              <div className="mt-3 text-center text-[10px] text-zinc-500">Mixer Visuals himoyasi</div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function CaptchaField({ a, b, value, onChange, onRefresh, onEnter }: {
-  a: number; b: number; value: string;
-  onChange: (v: string) => void; onRefresh: () => void; onEnter: () => void;
+function RecaptchaBox({ verified, loading, onCheck }: {
+  verified: boolean; loading: boolean; onCheck: () => void;
 }) {
   return (
-    <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2 text-xs text-zinc-400">
-          <ShieldCheck size={14} className="text-[#ffffff]" />
-          <span>Captcha — inson tekshiruvi</span>
-        </div>
-        <button
-          type="button"
-          onClick={onRefresh}
-          className="text-zinc-500 hover:text-white transition-colors"
-          title="Yangi misol"
-        >
-          <RefreshCw size={14} />
-        </button>
-      </div>
+    <button
+      type="button"
+      onClick={onCheck}
+      className="w-full flex items-center justify-between gap-3 rounded-lg bg-zinc-800/90 border border-zinc-600 p-3 text-left select-none transition-colors hover:border-zinc-500"
+    >
       <div className="flex items-center gap-3">
-        <span className="font-mono text-lg font-bold text-white whitespace-nowrap">{a} + {b} = ?</span>
-        <Input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && onEnter()}
-          className="flex-1 font-mono text-center"
-          placeholder="?"
-          inputMode="numeric"
-          autoComplete="off"
-        />
+        <span
+          className={`w-5 h-5 rounded-[4px] border flex items-center justify-center shrink-0 transition-all ${
+            verified ? 'bg-[#ffffff] border-[#ffffff]' : 'bg-white/10 border-zinc-500'
+          }`}
+        >
+          {verified ? (
+            <Check size={14} className="text-black" strokeWidth={3} />
+          ) : loading ? (
+            <Spinner />
+          ) : null}
+        </span>
+        <div>
+          <div className={`text-sm ${verified ? 'text-[#ffffff]' : 'text-zinc-200'}`}>
+            {verified ? 'Tasdiqlandi' : 'Men robot emasman'}
+          </div>
+          <div className="text-[10px] text-zinc-500">{verified ? 'Rahmat, tekshiruv o‘tdi' : 'Ochish uchun bosing'}</div>
+        </div>
       </div>
-    </div>
+      <div className="flex items-center gap-1.5">
+        <ShieldCheck size={20} className={verified ? 'text-[#ffffff]' : 'text-zinc-500'} />
+        <div className="text-[9px] leading-tight text-zinc-500">
+          Himoyalangan
+          <br />Mixer
+        </div>
+      </div>
+    </button>
   );
 }
