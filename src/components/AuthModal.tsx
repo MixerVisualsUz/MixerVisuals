@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext';
 import { useNav } from '../context/NavContext';
 import { Button, Input, Spinner } from './ui';
 
-const MIN_FORM_TIME = 2500;
 const MAX_ATTEMPTS = 5;
 const ATTEMPT_WINDOW = 60000;
 
@@ -33,7 +32,6 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
   const [captchaA, setCaptchaA] = useState(0);
   const [captchaB, setCaptchaB] = useState(0);
   const [captchaInput, setCaptchaInput] = useState('');
-  const openedAt = useRef(0);
 
   const genCaptcha = () => {
     setCaptchaA(Math.floor(Math.random() * 9) + 3);
@@ -45,7 +43,6 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
     if (open) {
       setError('');
       setTab('login');
-      openedAt.current = Date.now();
       genCaptcha();
     }
   }, [open]);
@@ -63,10 +60,9 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
 
   if (!open) return null;
 
-  // Himoya: honeypot + vaqt + urinishlar soni
+  // Himoya: honeypot + urinishlar soni
   const antiBotCheck = (): string | null => {
     if (honeypot) return 'robot';
-    if (Date.now() - openedAt.current < MIN_FORM_TIME) return 'too-fast';
     const attempts = getAttempts();
     if (attempts.count >= MAX_ATTEMPTS) return 'limited';
     return null;
