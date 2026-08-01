@@ -1,8 +1,8 @@
 -- ==================== BONUS (BOX) TIZIMI ====================
 -- "Bonus" bo'limidagi box ochilganda aniq foizlar bo'yicha sovg'a beradi:
---   55% -> 10% chegirma promokodi (BONUS10-XXXXXX, 1 marta ishlatiladigan)
---   25% -> 25% chegirma promokodi (BONUS25-XXXXXX, 1 marta ishlatiladigan)
---   15% -> 50% chegirma promokodi (BONUS50-XXXXXX, 1 marta ishlatiladigan)
+--   70% -> 5% chegirma promokodi (BONUS5-XXXXXX, 1 marta ishlatiladigan)
+--   10% -> 10% chegirma promokodi (BONUS10-XXXXXX, 1 marta ishlatiladigan)
+--   15% -> 15% chegirma promokodi (BONUS15-XXXXXX, 1 marta ishlatiladigan)
 --   5%  -> akkauntga to'g'ridan-to'g'ri 1 oylik obuna qo'shiladi
 -- Qo'shimcha: kuniga 1 marta ochish cheklovi (suiiste'molni oldini olish uchun)
 
@@ -35,26 +35,26 @@ BEGIN
   -- 1..100 oralig'ida real tasodifiy son
   v_roll := floor(random() * 100) + 1;
 
-  IF v_roll <= 55 THEN
-    -- 55%: 10% chegirma
+  IF v_roll <= 70 THEN
+    -- 70%: 5% chegirma
+    v_code := 'BONUS5-' || upper(substr(md5(random()::text), 1, 6));
+    INSERT INTO public.promocodes (code, discount_percent, max_uses, active)
+    VALUES (v_code, 5, 1, true);
+    RETURN jsonb_build_object('type', 'promo', 'code', v_code, 'discount_percent', 5);
+
+  ELSIF v_roll <= 80 THEN
+    -- 10%: 10% chegirma
     v_code := 'BONUS10-' || upper(substr(md5(random()::text), 1, 6));
     INSERT INTO public.promocodes (code, discount_percent, max_uses, active)
     VALUES (v_code, 10, 1, true);
     RETURN jsonb_build_object('type', 'promo', 'code', v_code, 'discount_percent', 10);
 
-  ELSIF v_roll <= 80 THEN
-    -- 25%: 25% chegirma
-    v_code := 'BONUS25-' || upper(substr(md5(random()::text), 1, 6));
-    INSERT INTO public.promocodes (code, discount_percent, max_uses, active)
-    VALUES (v_code, 25, 1, true);
-    RETURN jsonb_build_object('type', 'promo', 'code', v_code, 'discount_percent', 25);
-
   ELSIF v_roll <= 95 THEN
-    -- 15%: 50% chegirma
-    v_code := 'BONUS50-' || upper(substr(md5(random()::text), 1, 6));
+    -- 15%: 15% chegirma
+    v_code := 'BONUS15-' || upper(substr(md5(random()::text), 1, 6));
     INSERT INTO public.promocodes (code, discount_percent, max_uses, active)
-    VALUES (v_code, 50, 1, true);
-    RETURN jsonb_build_object('type', 'promo', 'code', v_code, 'discount_percent', 50);
+    VALUES (v_code, 15, 1, true);
+    RETURN jsonb_build_object('type', 'promo', 'code', v_code, 'discount_percent', 15);
 
   ELSE
     -- 5%: 1 oylik obuna to'g'ridan-to'g'ri akkauntga
