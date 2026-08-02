@@ -28,12 +28,16 @@ Deno.serve(async (req) => {
     if (blocked) return json({ allowed: false, reason: 'ip_ban', country_code: null });
 
     const resp = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}`, { signal: AbortSignal.timeout(5000) }).catch(() => null);
-    if (!resp || !resp.ok) return json({ allowed: true, reason: 'unknown' });
-    const geo = await resp.json().catch(() => null);
-    if (!geo || geo.success !== true) return json({ allowed: true, reason: 'unknown' });
-
-    const countryCode = String(geo.country_code || '').toUpperCase();
-    return json({ allowed: countryCode === 'UZ', country_code: countryCode, country: geo.country || '' });
+    let countryCode = '';
+    let country = '';
+    if (resp && resp.ok) {
+      const geo = await resp.json().catch(() => null);
+      if (geo && geo.success === true) {
+        countryCode = String(geo.country_code || '').toUpperCase();
+        country = geo.country || '';
+      }
+    }
+    return json({ allowed: true, country_code: countryCode || null, country: country || null });
   } catch {
     return json({ allowed: true, reason: 'unknown' });
   }

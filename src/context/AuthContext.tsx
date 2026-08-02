@@ -106,9 +106,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (email: string, password: string) => {
     const { data: loc } = await supabase.functions.invoke('check-location');
-    if (loc && !loc.allowed) {
-      if (loc.reason === 'ip_ban') return { success: false, message: 'Bu IP manzil abadiy bloklangan — kirish taqiqlangan' };
-      return { success: false, message: 'Faqat O‘zbekiston hududidan kirish mumkin' };
+    if (loc && !loc.allowed && loc.reason === 'ip_ban') {
+      return { success: false, message: 'Bu IP manzil abadiy bloklangan — kirish taqiqlangan' };
     }
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { success: false, message: translateError(error.message) };
