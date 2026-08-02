@@ -7,22 +7,29 @@ const { spawn, execSync } = childProcess;
 
 let gameProcess = null;
 let launcherQuitting = false;
+let gameQuitTimer = null;
+let gameWindowShown = false;
+let mcOutputTail = [];
 const originalSpawn = childProcess.spawn;
 childProcess.spawn = function (...args) {
   const exe = String(args[0] || '').toLowerCase();
   const spawnArgs = args[1] && args[1].join ? args[1].join(' ') : '';
-  const isJavaLaunch = exe.includes('java') || spawnArgs.includes('net.fabricmc');
-  if (isJavaLaunch) {
-    args[2] = Object.assign({}, args[2], { detached: true, stdio: 'ignore' });
+  const isGameLaunch = exe.includes('java') && spawnArgs.includes('net.fabricmc');
+  if (isGameLaunch) {
+    args[2] = Object.assign({}, args[2], { detached: true });
   }
   const proc = originalSpawn.apply(this, args);
-  if (isJavaLaunch) {
+  if (isGameLaunch) {
     gameProcess = proc;
+    setLaunch({ progress: 1, state: 'running', status: 'O\'yin boshlanmoqda...' });
     proc.once('spawn', () => {
-      setLaunch({ progress: 1, state: 'running', status: 'O\'yin boshlanmoqda...' });
-      quitLauncher();
+      log('GAME PROC spawned, pid =', proc.pid);
+      gameQuitTimer = setTimeout(quitLauncher, 120000);
     });
-    proc.once('exit', (code, signal) => { log('GAME PROC exit, code =', code, ', signal =', signal); });
+    proc.once('exit', (code, signal) => {
+      log('GAME PROC exit, code =', code, ', signal =', signal);
+      if (gameQuitTimer) { clearTimeout(gameQuitTimer); gameQuitTimer = null; }
+    });
   }
   return proc;
 };
@@ -30,6 +37,7 @@ childProcess.spawn = function (...args) {
 function quitLauncher() {
   if (launcherQuitting) return;
   launcherQuitting = true;
+  if (gameQuitTimer) { clearTimeout(gameQuitTimer); gameQuitTimer = null; }
   try { if (mainWindow && !mainWindow.isDestroyed()) mainWindow.destroy(); } catch (_) {}
   app.quit();
   setTimeout(() => process.exit(0), 3000).unref();
@@ -605,7 +613,6 @@ function onMcEvent(e) {
     setLaunch({ progress: prog, status: e.task || e.status || lastLaunch.status });
     if (e.type === 'launch' && prog >= 1) {
       setLaunch({ state: 'running', status: 'O\'yin boshlanmoqda...' });
-      quitLauncher();
     }
   } else if (e.type === 'status' && e.task) {
     setLaunch({ status: e.task });
@@ -617,6 +624,18 @@ function onMcEvent(e) {
       status: e.type === 'assets' ? 'O\'yin resurslari yuklanmoqda...' : 'Kutubxonalar yuklanmoqda...',
     });
   }
+}
+
+function computeMaxRam(requested) {
+  let want = parseInt(requested, 10) || 8192;
+  try {
+    const sysRamMb = require('os').totalmem() / 1024 / 1024;
+    const safeMax = Math.floor(sysRamMb) - 1024;
+    want = Math.min(want, safeMax);
+  } catch (_) {}
+  want = Math.max(2048, Math.min(want, 16384));
+  log('RAM: requested =', requested, ', effective =', want);
+  return want;
 }
 
 async function launchMinecraft(options) {
@@ -654,7 +673,7 @@ async function launchMinecraft(options) {
       type: 'release',
       custom: profileId,
     },
-    memory: { max: String(options.ram || 8192), min: '1024' },
+    memory: { max: String(computeMaxRam(options.ram)), min: '1024' },
     javaPath: javaPath,
     window: { width: 1280, height: 720, fullscreen: false },
     overrides: {
@@ -668,14 +687,30 @@ async function launchMinecraft(options) {
   return new Promise((resolve, reject) => {
     if (!launchClient) { reject(new Error('launchClient is null')); return; }
     launchClient.on('debug', (e) => { log('MC debug:', e); });
-    launchClient.on('data', (e) => { log('MC data:', String(e).slice(0, 200)); onMcEvent(e); });
+    launchClient.on('data', (e) => {
+      const s = String(e);
+      mcOutputTail.push(s);
+      if (mcOutputTail.length > 30) mcOutputTail.shift();
+      log('MC data:', s.slice(0, 200));
+      onMcEvent(e);
+      if (!launcherQuitting && gameProcess && (s.includes('Sound engine started') || s.includes('Java GUI initialized') || (s.includes('Created:') && s.includes('atlas')))) {
+        gameWindowShown = true;
+        log('GAME WINDOW DETECTED, closing launcher');
+        quitLauncher();
+      }
+    });
     launchClient.on('progress', (e) => { log('MC progress:', e); onMcEvent(e); });
     launchClient.on('error', (e) => { log('MC error:', e); launchClient = null; setLaunch({ state: 'failed', error: e.message }); reject(e); });
-    launchClient.on('close', () => {
-      log('MC close, gameProcess =', !!gameProcess);
+    launchClient.on('close', (code) => {
+      log('MC close, gameProcess =', !!gameProcess, ', windowShown =', gameWindowShown, ', code =', code);
       launchClient = null;
       if (!gameProcess) {
         setLaunch({ state: 'failed', progress: lastLaunch.progress, error: 'O\'yin ishga tushmadi. Yangi launcher faylini yuklab olib, qayta urinib ko\'ring.' });
+      } else if (!gameWindowShown) {
+        const lines = mcOutputTail.join('\n').split('\n');
+        const clues = lines.filter((l) => /error|exception|could not|heap|gpu|gl_|failed|insufficient|jvm|memory/i.test(l)).slice(-4);
+        const detail = (clues.length ? '\n' + clues.join('\n').slice(0, 400) : '');
+        setLaunch({ state: 'failed', progress: lastLaunch.progress, error: 'O\'yin ishga tushmadi (kod ' + code + '). Kompyuter xotirasi, video karta yoki antivirus sabab bo\'lishi mumkin. Sozlamalardan RAM\'ni pasaytirib qayta urinib ko\'ring.' + detail });
       } else {
         setLaunch({ state: 'done', status: 'O\'yin tugadi' });
       }
