@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
-import { Shield, Search, KeyRound, Users, CreditCard, Check, X, Ban, ShieldCheck, Tag, Plus, Trash2, Fingerprint, Gift, Pencil, RefreshCw } from 'lucide-react';
+import { Shield, Search, KeyRound, Users, CreditCard, Check, X, Ban, ShieldCheck, Tag, Plus, Trash2, Fingerprint, Gift, Pencil, RefreshCw, Globe, Smartphone } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Card, Badge, Input, Spinner, Button } from './ui';
 import { supabase } from '../lib/supabase';
@@ -130,8 +130,31 @@ function PaymentsTab() {
   );
 }
 
+function describeDevice(ua: string | null | undefined): string {
+  if (!ua) return 'noma\'lum';
+  const os = /Windows NT 10\.0/.test(ua) ? 'Windows 10'
+    : /Windows NT 6\.3/.test(ua) ? 'Windows 8.1'
+    : /Windows NT 6\.1/.test(ua) ? 'Windows 7'
+    : /Windows/.test(ua) ? 'Windows'
+    : /iPhone/.test(ua) ? 'iPhone'
+    : /iPad/.test(ua) ? 'iPad'
+    : /Android/.test(ua) ? 'Android'
+    : /Mac OS X/.test(ua) ? 'macOS'
+    : /Linux/.test(ua) ? 'Linux'
+    : 'Qurilma';
+  const browser = /Edg\//.test(ua) ? 'Edge'
+    : /Firefox\//.test(ua) ? 'Firefox'
+    : /OPR\//.test(ua) ? 'Opera'
+    : /Chrome\//.test(ua) ? 'Chrome'
+    : /Safari\//.test(ua) ? 'Safari'
+    : 'brauzer';
+  const model = ua.match(/; (SM-[A-Z0-9]+|M[0-9]{3}[A-Z][0-9]|Pixel \d[^;]*|iPhone\d[\d,]*|Redmi[^;]*|POCO[^;]*|Xiaomi[^;]*|Galaxy [^;]*)\)/);
+  return `${os} • ${browser}${model ? ' (' + model[1].trim() + ')' : ''}`;
+}
+
 function UsersTab() {
   const [users, setUsers] = useState<Profile[]>([]);
+  const [regInfo, setRegInfo] = useState<Map<string, { ip: string; device: string | null; created_at: string }>>(new Map());
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [grantUserId, setGrantUserId] = useState<string | null>(null);
@@ -139,8 +162,14 @@ function UsersTab() {
   const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string; userId: string } | null>(null);
 
   const load = async () => {
-    const { data } = await supabase.from('profiles').select('*').order('created_at', { ascending: false });
-    setUsers((data as Profile[]) || []);
+    const [u, r] = await Promise.all([
+      supabase.from('profiles').select('*').order('created_at', { ascending: false }),
+      supabase.from('registration_ips').select('ip, device, created_at, email'),
+    ]);
+    setUsers((u.data as Profile[]) || []);
+    const m = new Map<string, { ip: string; device: string | null; created_at: string }>();
+    (r.data || []).forEach((row) => m.set(row.email as string, row as never));
+    setRegInfo(m);
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -228,6 +257,15 @@ function UsersTab() {
                   <Fingerprint size={12} /> HWID: {u.hwid || 'kiritilmagan'}
                   <span className="text-zinc-600">•</span> Obuna: {planByCode(u.subscription_plan || '')?.name || 'yo‘q'}
                   {u.subscription_expires && <span className="text-zinc-600">• {u.subscription_expires}</span>}
+                </div>
+                <div className="text-xs text-zinc-500 mt-1 flex items-center gap-2 flex-wrap">
+                  <Globe size={12} /> IP: {regInfo.get(u.email)?.ip || 'noma‘lum'}
+                  <span className="text-zinc-600">•</span> <Smartphone size={12} /> Qurilma: {describeDevice(regInfo.get(u.email)?.device)}
+                  {regInfo.get(u.email) && (
+                    <>
+                      <span className="text-zinc-600">•</span> Ro‘yxatdan: {new Date(regInfo.get(u.email)!.created_at).toLocaleDateString('uz-UZ')} {new Date(regInfo.get(u.email)!.created_at).toLocaleTimeString('uz-UZ', { hour: '2-digit', minute: '2-digit' })}
+                    </>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">

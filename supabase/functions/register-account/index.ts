@@ -20,6 +20,7 @@ Deno.serve(async (req) => {
     const rawIp = req.headers.get('x-forwarded-for') || '';
     const ip = rawIp.split(',')[0].trim();
     if (!ip) return json({ error: 'IP manzil aniqlanmadi' }, 400);
+    const device = String(req.headers.get('user-agent') || '').slice(0, 300);
 
     const body = await req.json().catch(() => ({}));
     const username = String(body?.username || '').trim();
@@ -51,7 +52,7 @@ Deno.serve(async (req) => {
     const { data: existing } = await admin.from('registration_ips').select('id').eq('ip', ip).maybeSingle();
     if (existing) return json({ error: IP_USED }, 409);
 
-    const { error: ipErr } = await admin.from('registration_ips').insert({ ip, email });
+    const { error: ipErr } = await admin.from('registration_ips').insert({ ip, email, device });
     if (ipErr) {
       if (ipErr.code === '23505' || (ipErr.message || '').toLowerCase().includes('duplicate')) {
         return json({ error: IP_USED }, 409);
