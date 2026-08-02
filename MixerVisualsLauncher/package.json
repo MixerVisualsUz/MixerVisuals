@@ -18,16 +18,13 @@
       "ui/**/*",
       "assets/**/*",
       "MixerVisuals.jar",
-      "java21/**",
       "mods/**",
       "mod/**/*",
       "!mod/.gradle/**/*",
       "!mod/build/**/*",
       "!mod/workspace/**/*"
     ],
-    "asarUnpack": [
-      "java21/**"
-    ],
+    "asarUnpack": [],
     "extraResources": [],
     "win": {
       "target": [

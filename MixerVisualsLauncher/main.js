@@ -228,6 +228,15 @@ function javaMajorVersion(javaPath) {
   return 0;
 }
 
+function javaIsUsable(javaPath) {
+  if (javaMajorVersion(javaPath) < 21) return false;
+  if (path.isAbsolute(javaPath) && /bin[\\/]java\.exe$/i.test(javaPath)) {
+    const root = path.join(path.dirname(path.dirname(javaPath)));
+    if (!fs.existsSync(path.join(root, 'conf', 'security', 'java.security'))) return false;
+  }
+  return true;
+}
+
 function bundledJavaDir() {
   const candidates = [
     process.resourcesPath ? path.join(process.resourcesPath, 'app.asar.unpacked', 'java21') : null,
@@ -257,66 +266,77 @@ function bundledModsDir() {
 }
 
 function findJava() {
-  const bundled = bundledJavaDir();
-  if (bundled) return path.join(bundled, 'bin', 'java.exe');
-  const cached = path.join(JAVA_DIR, 'bin', 'java.exe');
-  if (fs.existsSync(cached)) return cached;
   const candidates = [
+    path.join(JAVA_DIR, 'bin', 'java.exe'),
+    bundledJavaDir() ? path.join(bundledJavaDir(), 'bin', 'java.exe') : null,
     path.join(process.env.JAVA_HOME || '', 'bin', 'java.exe'),
     path.join(process.env.JDK_HOME || '', 'bin', 'java.exe'),
     'java',
   ];
   for (const c of candidates) {
     if (!c) continue;
-    if (javaMajorVersion(c) >= 21) return c;
+    if (javaIsUsable(c)) return c;
   }
-  return 'java';
+  return null;
 }
 
 async function ensureJava() {
   let javaPath = findJava();
-  if (javaPath === 'java') {
-    await downloadJava();
-    javaPath = findJava();
+  if (!javaPath) {
+    javaPath = await downloadJava();
   }
-  if (javaPath === 'java') {
-    throw new Error('Java 21 topilmadi va yuklab bo\'lmadi');
+  if (!javaPath) {
+    throw new Error('Java 21 topilmadi va yuklab olinmadi. Internet aloqasini tekshirib, qayta urinib ko\'ring.');
   }
   return javaPath;
 }
 
 async function downloadJava() {
   try {
+    setLaunch({ status: 'Java 21 yuklanmoqda (birinchi marta, ~50 MB)...' });
     const resp = await fetch(`${ADOPTIUM_API}/assets/latest/21/hotspot?os=windows&arch=x64&image_type=jre`);
-    if (!resp.ok) throw new Error('Failed to get Java download');
+    if (!resp.ok) throw new Error('Java ma\'lumotlarini olishda xatolik (HTTP ' + resp.status + ')');
     const data = await resp.json();
     const list = Array.isArray(data) ? data : (data.assets || data);
     const entry = list[0];
-    if (!entry || !entry.binary) throw new Error('No Java binary found');
-    const pkg = entry.binary.package;
-    if (!pkg || !pkg.link) throw new Error('No JRE download link');
-    const zipResp = await fetch(pkg.link);
-    if (!zipResp.ok) throw new Error('Failed to download Java');
+    if (!entry || !entry.binary) throw new Error('Java yuklab olish havolasi topilmadi');
+    const link = entry.binary.package?.link;
+    if (!link) throw new Error('JRE havolasi topilmadi');
+    const zipResp = await fetch(link);
+    if (!zipResp.ok) throw new Error('Java yuklab olishda xatolik (HTTP ' + zipResp.status + ')');
     const buf = Buffer.from(await zipResp.arrayBuffer());
+    setLaunch({ status: 'Java 21 o\'rnatilmoqda...' });
     const zipPath = path.join(DATA_DIR, 'java.zip');
     fs.writeFileSync(zipPath, buf);
-    const AdmZip = require('adm-zip');
-    const zip = new AdmZip(zipPath);
-    zip.extractAllTo(JAVA_DIR, true);
-    fs.unlinkSync(zipPath);
-    const subdirs = fs.readdirSync(JAVA_DIR).filter(f => fs.statSync(path.join(JAVA_DIR, f)).isDirectory());
-    for (const sub of subdirs) {
-      const subBin = path.join(JAVA_DIR, sub, 'bin', 'java.exe');
-      if (fs.existsSync(subBin)) {
-        const tempDir = path.join(DATA_DIR, '_java_temp');
-        fs.renameSync(path.join(JAVA_DIR, sub), tempDir);
-        fs.rmSync(JAVA_DIR, { recursive: true, force: true });
-        fs.renameSync(tempDir, JAVA_DIR);
-        break;
+    try {
+      const AdmZip = require('adm-zip');
+      const zip = new AdmZip(zipPath);
+      fs.rmSync(JAVA_DIR, { recursive: true, force: true });
+      zip.extractAllTo(JAVA_DIR, true);
+      const subdirs = fs.readdirSync(JAVA_DIR).filter((f) => fs.statSync(path.join(JAVA_DIR, f)).isDirectory());
+      for (const sub of subdirs) {
+        const subBin = path.join(JAVA_DIR, sub, 'bin', 'java.exe');
+        if (fs.existsSync(subBin)) {
+          const tempDir = path.join(DATA_DIR, '_java_temp');
+          fs.rmSync(tempDir, { recursive: true, force: true });
+          fs.renameSync(path.join(JAVA_DIR, sub), tempDir);
+          fs.rmSync(JAVA_DIR, { recursive: true, force: true });
+          fs.renameSync(tempDir, JAVA_DIR);
+          break;
+        }
       }
+    } finally {
+      try { fs.unlinkSync(zipPath); } catch (_) {}
     }
+    const finalJava = path.join(JAVA_DIR, 'bin', 'java.exe');
+    if (!javaIsUsable(finalJava)) throw new Error('Java o\'rnatildi, lekin tekshiruvdan o\'tmadi');
+    log('Java 21 downloaded & installed to', JAVA_DIR);
+    return finalJava;
   } catch (e) {
     console.error('Java download failed:', e);
+    log('Java download failed:', e.message);
+    setLaunch({ status: 'Java yuklab olishda xatolik' });
+    return null;
   }
 }
 
