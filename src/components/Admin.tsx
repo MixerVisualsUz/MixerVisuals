@@ -148,6 +148,17 @@ function UsersTab() {
   const toggleBlock = async (u: Profile) => { await supabase.from('profiles').update({ blocked: !u.blocked }).eq('id', u.id); load(); };
   const clearHwid = async (u: Profile) => { await supabase.from('profiles').update({ hwid: null }).eq('id', u.id); load(); };
 
+  const banIp = async (u: Profile) => {
+    if (!window.confirm(`"${u.email}" foydalanuvchisining IP manzilini abadiy bloklaysizmi? Bu IP'dan boshqa hech qachon akkount ochib bo‘lmaydi.`)) return;
+    const { data: reg } = await supabase.from('registration_ips').select('ip').eq('email', u.email).maybeSingle();
+    if (!reg?.ip) { setMsg({ type: 'err', text: 'Bu foydalanuvchining IP manzili bazada yo‘q (IP hisobga olinishidan oldin ro‘yxatdan o‘tgan)', userId: u.id }); return; }
+    const { error } = await supabase.from('blocked_ips').insert({ ip: reg.ip, note: 'IP BAN: ' + u.email });
+    if (error && !error.message.includes('duplicate')) { setMsg({ type: 'err', text: 'Xatolik: ' + error.message, userId: u.id }); return; }
+    await supabase.from('profiles').update({ blocked: true }).eq('id', u.id);
+    setMsg({ type: 'ok', text: `IP BAN: ${reg.ip} abadiy bloklandi`, userId: u.id });
+    load();
+  };
+
   const clearAllHwids = async () => {
     if (!window.confirm('BARCHA foydalanuvchilarning HWID bog‘lanishini tozalaysizmi? Har bir foydalanuvchi o‘z qurilmasida qaytadan kirishi kerak bo‘ladi.')) return;
     const { error } = await supabase.from('profiles').update({ hwid: null }).neq('hwid', null);
@@ -224,6 +235,7 @@ function UsersTab() {
                 {u.blocked ? <Badge color="red"><Ban size={12} /> Bloklangan</Badge> : <Badge color="green"><ShieldCheck size={12} /> Faol</Badge>}
                 {u.hwid && <Button size="sm" variant="ghost" onClick={() => clearHwid(u)}><Fingerprint size={14} /> HWID tozalash</Button>}
                 <Button size="sm" variant="secondary" onClick={() => toggleBlock(u)}>{u.blocked ? 'Blokdan chiqarish' : 'Bloklash'}</Button>
+                <Button size="sm" variant="secondary" onClick={() => banIp(u)} className="!text-red-400"><Ban size={14} /> IP BAN</Button>
                 <Button size="sm" variant="secondary" onClick={() => deleteAccount(u)} className="!text-red-400"><Trash2 size={14} /> O‘chirish</Button>
               </div>
             </div>

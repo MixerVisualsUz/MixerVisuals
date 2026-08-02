@@ -40,6 +40,14 @@ Deno.serve(async (req) => {
     const { data: emailBlocked } = await admin.from('blocked_emails').select('id').eq('email', email).maybeSingle();
     if (emailBlocked) return json({ error: 'Bu email abadiy bloklangan' }, 403);
 
+    const geoResp = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}`, { signal: AbortSignal.timeout(5000) }).catch(() => null);
+    if (geoResp?.ok) {
+      const geo = await geoResp.json().catch(() => null);
+      if (geo && geo.success === true && String(geo.country_code || '').toUpperCase() !== 'UZ') {
+        return json({ error: 'Ro\'yxatdan o\'tish faqat O\'zbekiston hududidan mumkin' }, 403);
+      }
+    }
+
     const { data: existing } = await admin.from('registration_ips').select('id').eq('ip', ip).maybeSingle();
     if (existing) return json({ error: IP_USED }, 409);
 

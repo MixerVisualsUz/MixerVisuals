@@ -105,6 +105,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadProfile]);
 
   const signIn = useCallback(async (email: string, password: string) => {
+    const { data: loc } = await supabase.functions.invoke('check-location');
+    if (loc && !loc.allowed) {
+      if (loc.reason === 'ip_ban') return { success: false, message: 'Bu IP manzil abadiy bloklangan — kirish taqiqlangan' };
+      return { success: false, message: 'Faqat O‘zbekiston hududidan kirish mumkin' };
+    }
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { success: false, message: translateError(error.message) };
     return { success: true, message: 'Tizimga muvaffaqiyatli kirildi' };
@@ -114,8 +119,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.functions.invoke('register-account', {
       body: { username, email, password },
     });
-    if (error) return { success: false, message: data?.error || translateError(error.message) };
-    if (!data?.ok) return { success: false, message: data?.error || 'Ro‘yxatdan o‘tish amalga oshmadi' };
+    const ctx = (error as { context?: { error?: string } } | null)?.context;
+    if (error) return { success: false, message: ctx?.error || (data as { error?: string } | null)?.error || translateError(error.message) };
+    if (!data?.ok) return { success: false, message: (data as { error?: string } | null)?.error || 'Ro‘yxatdan o‘tish amalga oshmadi' };
     return { success: true, message: 'Ro‘yxatdan o‘tish muvaffaqiyatli. Tizimga kiring.' };
   }, []);
 
