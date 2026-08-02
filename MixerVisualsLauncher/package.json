@@ -1,6 +1,6 @@
 {
   "name": "mixer-visuals-launcher",
-  "version": "1.0.0",
+  "version": "1.5.0",
   "description": "Mixer Visuals Launcher",
   "main": "main.js",
   "scripts": {
@@ -20,11 +20,14 @@
       "MixerVisuals.jar",
       "mods/**",
       "mod/**/*",
+      "java21/**",
       "!mod/.gradle/**/*",
       "!mod/build/**/*",
       "!mod/workspace/**/*"
     ],
-    "asarUnpack": [],
+    "asarUnpack": [
+      "java21/**"
+    ],
     "extraResources": [],
     "win": {
       "target": [

@@ -16,7 +16,7 @@ childProcess.spawn = function (...args) {
   const spawnArgs = args[1] && args[1].join ? args[1].join(' ') : '';
   const isGameLaunch = exe.includes('java') && spawnArgs.includes('net.fabricmc');
   if (isGameLaunch) {
-    args[2] = Object.assign({}, args[2], { detached: true });
+    args[2] = Object.assign({}, args[2], { detached: true, windowsHide: true });
   }
   const proc = originalSpawn.apply(this, args);
   if (isGameLaunch) {
@@ -221,7 +221,7 @@ async function verifyAuthServerSide() {
 
 function javaMajorVersion(javaPath) {
   try {
-    const out = execSync(`"${javaPath}" -version 2>&1`, { stdio: 'pipe' }).toString();
+    const out = execSync(`"${javaPath}" -version 2>&1`, { stdio: 'pipe', windowsHide: true }).toString();
     const m = out.match(/version\s+"([0-9]+)/);
     if (m) return parseInt(m[1], 10);
   } catch (_) {}
@@ -343,7 +343,7 @@ async function downloadJava() {
 async function ensureAdmZip() {
   try { require.resolve('adm-zip'); } catch (_) {
     await new Promise((resolve, reject) => {
-      const cp = spawn('npm', ['install', 'adm-zip'], { cwd: __dirname, stdio: 'pipe' });
+      const cp = spawn('npm', ['install', 'adm-zip'], { cwd: __dirname, stdio: 'pipe', windowsHide: true });
       cp.on('exit', (code) => code === 0 ? resolve() : reject(new Error('npm install failed')));
     });
   }
@@ -497,7 +497,7 @@ async function buildMod() {
   const gradlew = path.join(MOD_PROJECT_DIR, 'gradlew.bat');
   if (!fs.existsSync(gradlew)) return null;
   try {
-    execSync(`"${gradlew}" build`, { cwd: MOD_PROJECT_DIR, stdio: 'pipe', timeout: 180000 });
+    execSync(`"${gradlew}" build`, { cwd: MOD_PROJECT_DIR, stdio: 'pipe', timeout: 180000, windowsHide: true });
     const buildDir = path.join(MOD_PROJECT_DIR, 'build', 'libs');
     if (!fs.existsSync(buildDir)) return null;
     const allJars = fs.readdirSync(buildDir).filter(f => f.endsWith('.jar') && !f.endsWith('-sources.jar'));
