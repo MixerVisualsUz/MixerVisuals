@@ -111,13 +111,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = useCallback(async (username: string, email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { username } },
+    const { data, error } = await supabase.functions.invoke('register-account', {
+      body: { username, email, password },
     });
-    if (error) return { success: false, message: translateError(error.message) };
-    if (!data.user) return { success: false, message: 'Ro‘yxatdan o‘tish amalga oshmadi' };
+    if (error) return { success: false, message: data?.error || translateError(error.message) };
+    if (!data?.ok) return { success: false, message: data?.error || 'Ro‘yxatdan o‘tish amalga oshmadi' };
     return { success: true, message: 'Ro‘yxatdan o‘tish muvaffaqiyatli. Tizimga kiring.' };
   }, []);
 
