@@ -34,6 +34,12 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } },
     );
 
+    const { data: ipBlocked } = await admin.from('blocked_ips').select('id').eq('ip', ip).maybeSingle();
+    if (ipBlocked) return json({ error: 'Bu IP manzil abadiy bloklangan — ro\'yxatdan o\'tish taqiqlangan' }, 403);
+
+    const { data: emailBlocked } = await admin.from('blocked_emails').select('id').eq('email', email).maybeSingle();
+    if (emailBlocked) return json({ error: 'Bu email abadiy bloklangan' }, 403);
+
     const { data: existing } = await admin.from('registration_ips').select('id').eq('ip', ip).maybeSingle();
     if (existing) return json({ error: IP_USED }, 409);
 

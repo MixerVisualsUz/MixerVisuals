@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase';
 import { getAllPlans, loadPlans, formatPrice, planByCode } from '../lib/plans';
 import type { LicenseKey, Payment, Profile, Plan, Promocode } from '../lib/types';
 
-type AdminTab = 'payments' | 'users' | 'plans' | 'promocodes';
+type AdminTab = 'payments' | 'users' | 'plans' | 'promocodes' | 'blocked';
 
 export function Admin() {
   const { profile } = useAuth();
@@ -26,6 +26,7 @@ export function Admin() {
     { id: 'users', label: 'Foydalanuvchilar', icon: Users },
     { id: 'plans', label: 'Tariflar', icon: Tag },
     { id: 'promocodes', label: 'Promokodlar', icon: Gift },
+    { id: 'blocked', label: 'Bloklar', icon: Ban },
   ];
 
   return (
@@ -51,6 +52,7 @@ export function Admin() {
       {tab === 'users' && <UsersTab />}
       {tab === 'plans' && <PlansTab />}
       {tab === 'promocodes' && <PromocodesTab />}
+      {tab === 'blocked' && <BlockedTab />}
     </div>
   );
 }
@@ -252,6 +254,120 @@ function UsersTab() {
             )}
           </Card>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function BlockedTab() {
+  const [ips, setIps] = useState<{ id: string; ip: string; note: string; created_at: string }[]>([]);
+  const [emails, setEmails] = useState<{ id: string; email: string; note: string; created_at: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [ipInput, setIpInput] = useState('');
+  const [emailInput, setEmailInput] = useState('');
+  const [note, setNote] = useState('');
+  const [msg, setMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  const load = async () => {
+    const [i, e] = await Promise.all([
+      supabase.from('blocked_ips').select('*').order('created_at', { ascending: false }),
+      supabase.from('blocked_emails').select('*').order('created_at', { ascending: false }),
+    ]);
+    setIps((i.data as typeof ips) || []);
+    setEmails((e.data as typeof emails) || []);
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  const addIp = async () => {
+    const ip = ipInput.trim();
+    if (!ip) { setMsg({ type: 'err', text: 'IP manzilni kiriting' }); return; }
+    const { error } = await supabase.from('blocked_ips').insert({ ip, note: note.trim() });
+    if (error) { setMsg({ type: 'err', text: error.message.includes('duplicate') ? 'Bu IP allaqachon bloklangan' : 'Xatolik: ' + error.message }); return; }
+    setIpInput('');
+    setMsg({ type: 'ok', text: 'IP abadiy bloklandi' });
+    load();
+  };
+
+  const addEmail = async () => {
+    const email = emailInput.trim().toLowerCase();
+    if (!email) { setMsg({ type: 'err', text: 'Email kiriting' }); return; }
+    const { error } = await supabase.from('blocked_emails').insert({ email, note: note.trim() });
+    if (error) { setMsg({ type: 'err', text: error.message.includes('duplicate') ? 'Bu email allaqachon bloklangan' : 'Xatolik: ' + error.message }); return; }
+    setEmailInput('');
+    setMsg({ type: 'ok', text: 'Email abadiy bloklandi' });
+    load();
+  };
+
+  const removeIp = async (id: string) => { await supabase.from('blocked_ips').delete().eq('id', id); load(); };
+  const removeEmail = async (id: string) => { await supabase.from('blocked_emails').delete().eq('id', id); load(); };
+
+  if (loading) return <div className="flex justify-center py-12"><Spinner className="text-[#ffffff]" /></div>;
+
+  return (
+    <div className="space-y-10">
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-white flex items-center gap-2"><Ban size={18} className="text-[#ffffff]" /> Bloklangan IP'lar</h3>
+        </div>
+        <p className="text-xs text-zinc-500 mb-3 -mt-2">Bloklangan IP'dan saytda boshqa hech qachon akkount ochib bo‘lmaydi (ro‘yxatdan o‘tish 403 bilan rad etiladi).</p>
+        <Card className="p-4 mb-4 space-y-3">
+          <div className="grid sm:grid-cols-3 gap-3 items-start">
+            <Input label="IP manzil" placeholder="masalan: 91.122.44.7" value={ipInput} onChange={(e) => setIpInput(e.target.value)} />
+            <Input label="Izoh (ixtiyoriy)" placeholder="masalan: gemini spam" value={note} onChange={(e) => setNote(e.target.value)} />
+            <div className="sm:pt-7">
+              <Button size="sm" onClick={addIp}><Plus size={14} /> IP bloklash</Button>
+            </div>
+          </div>
+        </Card>
+        {ips.length === 0 ? <Card className="p-6 text-center text-zinc-500">Bloklangan IP yo‘q.</Card> : (
+          <div className="space-y-2">
+            {ips.map((b) => (
+              <Card key={b.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="font-mono text-[#ffffff] text-sm">{b.ip}</div>
+                  <div className="text-xs text-zinc-500 mt-1">
+                    {new Date(b.created_at).toLocaleDateString('uz-UZ')}
+                    {b.note && <span className="text-zinc-400"> • {b.note}</span>}
+                  </div>
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => removeIp(b.id)} className="!text-red-400"><Trash2 size={14} /> O‘chirish</Button>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-white flex items-center gap-2"><Ban size={18} className="text-[#ffffff]" /> Bloklangan emaillar</h3>
+        </div>
+        <p className="text-xs text-zinc-500 mb-3 -mt-2">Bloklangan email bilan ro‘yxatdan o‘tib bo‘lmaydi. Gemini spam emaillari allaqachon qo‘shilgan.</p>
+        <Card className="p-4 mb-4 space-y-3">
+          <div className="grid sm:grid-cols-3 gap-3 items-start">
+            <Input label="Email" placeholder="masalan: spam@gmail.com" value={emailInput} onChange={(e) => setEmailInput(e.target.value)} />
+            <Input label="Izoh (ixtiyoriy)" placeholder="masalan: gemini spam" value={note} onChange={(e) => setNote(e.target.value)} />
+            <div className="sm:pt-7">
+              <Button size="sm" onClick={addEmail}><Plus size={14} /> Email bloklash</Button>
+            </div>
+          </div>
+        </Card>
+        {emails.length === 0 ? <Card className="p-6 text-center text-zinc-500">Bloklangan email yo‘q.</Card> : (
+          <div className="space-y-2">
+            {emails.map((b) => (
+              <Card key={b.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="text-[#ffffff] text-sm">{b.email}</div>
+                  <div className="text-xs text-zinc-500 mt-1">
+                    {new Date(b.created_at).toLocaleDateString('uz-UZ')}
+                    {b.note && <span className="text-zinc-400"> • {b.note}</span>}
+                  </div>
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => removeEmail(b.id)} className="!text-red-400"><Trash2 size={14} /> O‘chirish</Button>
+              </Card>
+            ))}
+          </div>
+        )}
+        {msg && <p className={`text-xs mt-3 ${msg.type === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>{msg.text}</p>}
       </div>
     </div>
   );
