@@ -521,10 +521,10 @@ type BoxResult =
   | { type: 'error'; message: string };
 
 const BOX_CHANCES = [
-  { pct: 70, label: '5% chegirma', desc: 'BONUS5-XXXXXX promokodi', color: 'text-zinc-300 border-white/20 bg-white/5' },
+  { pct: 74, label: '5% chegirma', desc: 'BONUS5-XXXXXX promokodi', color: 'text-zinc-300 border-white/20 bg-white/5' },
   { pct: 10, label: '10% chegirma', desc: 'BONUS10-XXXXXX promokodi', color: 'text-blue-300 border-blue-500/30 bg-blue-500/10' },
   { pct: 15, label: '15% chegirma', desc: 'BONUS15-XXXXXX promokodi', color: 'text-amber-300 border-amber-500/30 bg-amber-500/10' },
-  { pct: 5, label: '1 oylik obuna', desc: 'Akkauntga to‘g‘ridan-to‘g‘ri qo‘shiladi', color: 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10' },
+  { pct: 1, label: '1 oylik obuna', desc: 'Akkauntga to‘g‘ridan-to‘g‘ri qo‘shiladi', color: 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10' },
 ];
 
 function BonusView() {
