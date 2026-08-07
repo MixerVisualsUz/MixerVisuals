@@ -5,9 +5,9 @@ export const HUMO_CARD = '6262 5707 8470 4167';
 export const HUMO_OWNER = 'U. Allambergenova';
 export const SITE_DOMAIN = 'mixervisuals.su';
 
-// Yuklab olish — GitHub Releases dan
-export const DOWNLOAD_URL = 'https://github.com/MixerVisualsUz/MixerVisuals/releases/latest/download/MixerVisualsLauncher.exe';
-export const DOWNLOAD_VERSION = 'v1.5.0';
+// Yuklab olish — saytdan
+export const DOWNLOAD_URL = '/downloads/MixerVisuals.jar';
+export const DOWNLOAD_VERSION = 'v1.6.0';
 
 // Background images — dark atmospheric scenes
 export const BG_IMAGE = import.meta.env.BASE_URL + 'bg/1.jpg';

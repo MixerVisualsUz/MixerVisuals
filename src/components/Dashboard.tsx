@@ -187,8 +187,8 @@ function PanelView({ onBuy, onBuyHwid, planName }: { onBuy: () => void; onBuyHwi
         {hasSub ? (
           <>
             <p className="text-sm text-zinc-400 mb-4">Obunangiz faol! Mixer Visuals launcherini yuklab oling, o‘rnating va o‘yingizni chiroyli qiling.</p>
-            <a href={DOWNLOAD_URL} download="MixerVisualsLauncher.exe" className="block">
-              <Button size="lg" className="w-full sm:w-auto"><Download size={16} /> Launcher yuklab olish {DOWNLOAD_VERSION}</Button>
+            <a href={DOWNLOAD_URL} download="MixerVisuals.jar" className="block">
+              <Button size="lg" className="w-full sm:w-auto"><Download size={16} /> Mod yuklab olish {DOWNLOAD_VERSION}</Button>
             </a>
             <p className="text-xs text-zinc-500 mt-3">
               Launcherni o‘rnating, email va parolingiz bilan kiring hamda "O‘ynash" tugmasini bosing. Bitta kompyuterda faqat bitta akkount ishlaydi.
