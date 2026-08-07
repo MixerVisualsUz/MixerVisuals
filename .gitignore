@@ -23,8 +23,7 @@ dist-ssr
 .env
 .env.local
 
-# Downloads — GitHub Releases orqali tarqatiladi
-public/downloads/
+# Downloads — saytdan to'g'ridan-to'g'ri tarqatiladi
 
 # Launcher (fayl yig'indilari va build chiqimlari)
 MixerVisualsLauncher/node_modules/
