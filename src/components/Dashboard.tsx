@@ -186,12 +186,25 @@ function PanelView({ onBuy, onBuyHwid, planName }: { onBuy: () => void; onBuyHwi
         </div>
         {hasSub ? (
           <>
-            <p className="text-sm text-zinc-400 mb-4">Obunangiz faol! Mixer Visuals launcherini yuklab oling, o‘rnating va o‘yingizni chiroyli qiling.</p>
-            <a href={DOWNLOAD_URL} download="MixerVisuals.jar" className="block">
-              <Button size="lg" className="w-full sm:w-auto"><Download size={16} /> Mod yuklab olish {DOWNLOAD_VERSION}</Button>
-            </a>
+            <p className="text-sm text-zinc-400 mb-4">Obunangiz faol! Mod faylini yuklab oling va .minecraft/papkasiga tashlang.</p>
+            <Button size="lg" className="w-full sm:w-auto" onClick={() => {
+              const a1 = document.createElement('a');
+              a1.href = DOWNLOAD_URL;
+              a1.download = 'MixerVisuals.jar';
+              document.body.appendChild(a1);
+              a1.click();
+              document.body.removeChild(a1);
+              const blob = new Blob([JSON.stringify({ email: profile!.email })], { type: 'application/json' });
+              const a2 = document.createElement('a');
+              a2.href = URL.createObjectURL(blob);
+              a2.download = 'mixer-account.json';
+              document.body.appendChild(a2);
+              a2.click();
+              document.body.removeChild(a2);
+              URL.revokeObjectURL(a2.href);
+            }}><Download size={16} /> Mod yuklab olish {DOWNLOAD_VERSION}</Button>
             <p className="text-xs text-zinc-500 mt-3">
-              Launcherni o‘rnating, email va parolingiz bilan kiring hamda "O‘ynash" tugmasini bosing. Bitta kompyuterda faqat bitta akkount ishlaydi.
+              MixerVisuals.jar faylini .minecraft/mods papkasiga tashlang. mixer-account.json avtomatik yuklanadi — uni .minecraft papkasiga tashlang.
             </p>
           </>
         ) : (
