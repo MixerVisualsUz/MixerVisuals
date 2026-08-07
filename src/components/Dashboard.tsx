@@ -493,9 +493,78 @@ function PaymentView({ plan, onBack, onPaid }: { plan: Plan; onBack: () => void;
 }
 
 // ============ ECOSYSTEM ============
+const CONFIG_CODE_RE = /^[A-Za-z0-9-]{4,64}$/;
+
 function EcosystemView() {
-  const { profile } = useAuth();
-  const hasSub = !!profile?.subscription_plan;
+  const [createJson, setCreateJson] = useState('');
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createdCode, setCreatedCode] = useState<string | null>(null);
+  const [createMsg, setCreateMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  const [fetchCode, setFetchCode] = useState('');
+  const [fetchLoading, setFetchLoading] = useState(false);
+  const [fetchedJson, setFetchedJson] = useState<string | null>(null);
+  const [fetchMsg, setFetchMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  const createConfig = async () => {
+    setCreateMsg(null);
+    setCreatedCode(null);
+    const json = createJson.trim();
+    if (!json) {
+      setCreateMsg({ type: 'err', text: 'Konfig JSON ni kiriting.' });
+      return;
+    }
+    if (json.length < 10 || json.length > 50000) {
+      setCreateMsg({ type: 'err', text: 'JSON hajmi 10 dan 50 000 belgigacha bo‘lishi kerak.' });
+      return;
+    }
+    try {
+      JSON.parse(json);
+    } catch {
+      setCreateMsg({ type: 'err', text: 'JSON formati noto‘g‘ri. Tekshirib qayta kiriting.' });
+      return;
+    }
+    setCreateLoading(true);
+    const { data, error } = await supabase.rpc('create_shared_config', { p_payload: json });
+    setCreateLoading(false);
+    if (error) {
+      setCreateMsg({ type: 'err', text: 'Xatolik: ' + error.message });
+      return;
+    }
+    const r = data as { code?: string; error?: string };
+    if (r?.error || !r?.code) {
+      setCreateMsg({ type: 'err', text: r?.error || 'Kod yaratilmadi. Qayta urinib ko‘ring.' });
+      return;
+    }
+    setCreatedCode(r.code);
+    setCreateMsg({ type: 'ok', text: 'Konfig kodi yaratildi!' });
+  };
+
+  const fetchConfig = async () => {
+    setFetchMsg(null);
+    setFetchedJson(null);
+    const code = fetchCode.trim();
+    if (!CONFIG_CODE_RE.test(code)) {
+      setFetchMsg({ type: 'err', text: 'Kod formati noto‘g‘ri. Namuna: XXXX-XXXX-XXXX-XXXX' });
+      return;
+    }
+    setFetchLoading(true);
+    const { data, error } = await supabase.rpc('get_shared_config', { p_code: code });
+    setFetchLoading(false);
+    if (error) {
+      setFetchMsg({ type: 'err', text: 'Xatolik: ' + error.message });
+      return;
+    }
+    if (!data || typeof data !== 'string') {
+      setFetchMsg({ type: 'err', text: 'Bu kod bo‘yicha konfig topilmadi.' });
+      return;
+    }
+    setFetchedJson(data);
+    setFetchMsg({ type: 'ok', text: 'Konfig topildi!' });
+  };
+
+  const textareaCls =
+    'w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-100 font-mono text-xs placeholder:text-zinc-500 outline-none transition-all focus:border-[#ffffff]/50 focus:bg-white/[0.07] focus:ring-2 focus:ring-[#ffffff]/10';
 
   return (
     <div>
@@ -503,21 +572,105 @@ function EcosystemView() {
         <Cloud size={22} className="text-[#ffffff]" />
         <h2 className="text-2xl font-bold text-white">Konfiguratsiyalar</h2>
       </div>
-      <p className="text-zinc-500 mb-8">Bulutli xizmatlar va integratsiyalar.</p>
-      <Card className="p-8 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-[#ffffff]/10 border border-[#ffffff]/20 flex items-center justify-center mx-auto mb-4">
-          <Link2 size={26} className="text-[#ffffff]" />
-        </div>
-        <h3 className="text-lg font-semibold text-white">Bulutli konfiglar</h3>
-        {!hasSub ? (
-          <>
-            <p className="mt-2 text-sm text-zinc-400 max-w-md mx-auto">Bulutli xizmatlarga kirish uchun faol obuna kerak.</p>
-            <div className="mt-4 inline-flex items-center gap-2 text-sm text-amber-400"><AlertCircle size={16} /> Obuna faol emas</div>
-          </>
-        ) : (
-          <p className="mt-2 text-sm text-zinc-400">Sizda bulutli konfiguratsiyalarga ruxsat mavjud.</p>
-        )}
-      </Card>
+      <p className="text-zinc-500 mb-8">
+        Konfig yarating, kod oling va boshqa foydalanuvchilarga yuboring. Yoki kod bilan konfigni o‘rnating.
+      </p>
+
+      <div className="grid lg:grid-cols-2 gap-6 items-start">
+        {/* CREATE */}
+        <Card className="p-7">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-xl bg-[#ffffff]/10 border border-[#ffffff]/20 flex items-center justify-center">
+              <Link2 size={18} className="text-[#ffffff]" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white">Konfig yaratish</h3>
+              <p className="text-xs text-zinc-500">O‘z konfigingiz uchun kod oling</p>
+            </div>
+          </div>
+          <p className="text-sm text-zinc-400 mt-3 mb-3">
+            O‘yinda <span className="text-[#ffffff]">Configlar → konfig → o‘ng tugma → Ulashish</span> orqali olingan kodni
+            konfig kodi sifatida qayta yaratish shart emas. Boshqa yo‘l: konfig JSON ni bu yerga joylashtiring yoki
+            o‘yindagi <span className="text-[#ffffff]">MIXCFG1_...</span> eksport kodini shu yerga solib, yangi kod yarating.
+          </p>
+          <textarea
+            rows={8}
+            value={createJson}
+            onChange={(e) => setCreateJson(e.target.value)}
+            placeholder='{"modules": { ... }} yoki MIXCFG1_ eksport kodi'
+            className={textareaCls}
+            spellCheck={false}
+          />
+          {createMsg && (
+            <p className={`mt-2 text-sm flex items-center gap-1.5 ${createMsg.type === 'ok' ? 'text-[#ffffff]' : 'text-red-400'}`}>
+              {createMsg.type === 'ok' ? <Check size={14} /> : <AlertCircle size={14} />}{createMsg.text}
+            </p>
+          )}
+          {createdCode && (
+            <div className="mt-3 p-4 rounded-xl bg-[#ffffff]/10 border border-[#ffffff]/25">
+              <div className="text-xs text-zinc-400 mb-2">Konfig kodi</div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-white font-mono font-bold tracking-wider text-lg">{createdCode}</span>
+                <CopyButton text={createdCode} label="Kodni nusxalash" />
+              </div>
+              <p className="mt-3 text-xs text-zinc-500">
+                Kodni o‘yinda <span className="text-[#ffffff]">Configlar → Konfig o‘rnatish</span> bo‘limiga kiriting yoki boshqa
+                foydalanuvchiga yuboring.
+              </p>
+            </div>
+          )}
+          <Button className="w-full mt-4" onClick={createConfig} disabled={createLoading}>
+            {createLoading ? <Spinner /> : <><Link2 size={16} /> Kod yaratish</>}
+          </Button>
+        </Card>
+
+        {/* FETCH / INSTALL */}
+        <Card className="p-7">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-xl bg-[#ffffff]/10 border border-[#ffffff]/20 flex items-center justify-center">
+              <Download size={18} className="text-[#ffffff]" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white">Konfig o‘rnatish</h3>
+              <p className="text-xs text-zinc-500">Kod bo‘yicha konfigni topib oling</p>
+            </div>
+          </div>
+          <p className="text-sm text-zinc-400 mt-3 mb-3">
+            Kodni kiriting — konfig JSON topiladi. So‘ng o‘yinda{' '}
+            <span className="text-[#ffffff]">Configlar → Konfig o‘rnatish</span> bo‘limiga JSON ni joylashtirib o‘rnating.
+          </p>
+          <div className="flex gap-3">
+            <Input
+              placeholder="XXXX-XXXX-XXXX-XXXX"
+              value={fetchCode}
+              onChange={(e) => setFetchCode(e.target.value.toUpperCase())}
+              onKeyDown={(e) => e.key === 'Enter' && fetchConfig()}
+              className="flex-1 font-mono tracking-wider"
+            />
+            <Button onClick={fetchConfig} variant="secondary" disabled={fetchLoading}>
+              {fetchLoading ? <Spinner /> : 'Topish'}
+            </Button>
+          </div>
+          {fetchMsg && (
+            <p className={`mt-2 text-sm flex items-center gap-1.5 ${fetchMsg.type === 'ok' ? 'text-[#ffffff]' : 'text-red-400'}`}>
+              {fetchMsg.type === 'ok' ? <Check size={14} /> : <AlertCircle size={14} />}{fetchMsg.text}
+            </p>
+          )}
+          {fetchedJson && (
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-zinc-400">Konfig JSON</span>
+                <CopyButton text={fetchedJson} label="JSON ni nusxalash" />
+              </div>
+              <textarea rows={8} readOnly value={fetchedJson} className={textareaCls + ' opacity-90 cursor-default'} spellCheck={false} />
+              <p className="mt-2 text-xs text-zinc-500">
+                JSON ni o‘yinda <span className="text-[#ffffff]">Configlar → Konfig o‘rnatish</span> oynasiga joylashtiring —
+                avtomatik o‘rnatiladi.
+              </p>
+            </div>
+          )}
+        </Card>
+      </div>
     </div>
   );
 }
