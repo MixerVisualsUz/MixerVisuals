@@ -50,6 +50,6 @@ export interface Promocode {
 
 export type Route =
   | { name: 'landing' }
-  | { name: 'dashboard'; view: 'panel' | 'pricing' | 'payment' | 'ecosystem'; planCode?: string }
+  | { name: 'dashboard'; view: 'panel' | 'pricing' | 'payment' | 'bonus'; planCode?: string }
   | { name: 'admin' }
   | { name: 'documents' };
