@@ -3,7 +3,7 @@ export const TELEGRAM_URL = 'https://t.me/mixervisuals';
 export const TELEGRAM_SUPPORT = 'https://t.me/mixervisuals_support';
 export const HUMO_CARD = '6262 5707 8470 4167';
 export const HUMO_OWNER = 'U. Allambergenova';
-export const SITE_DOMAIN = 'mixervisuals.su';
+export const SITE_DOMAIN = 'mixervisuals.uz';
 
 // Yuklab olish — saytdan
 export const DOWNLOAD_URL = '/downloads/MixerVisuals.jar';
