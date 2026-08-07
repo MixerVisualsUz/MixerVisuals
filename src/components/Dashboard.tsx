@@ -186,25 +186,20 @@ function PanelView({ onBuy, onBuyHwid, planName }: { onBuy: () => void; onBuyHwi
         </div>
         {hasSub ? (
           <>
-            <p className="text-sm text-zinc-400 mb-4">Obunangiz faol! Mod faylini yuklab oling va .minecraft/papkasiga tashlang.</p>
+            <p className="text-sm text-zinc-400 mb-4">Obunangiz faol! Mod faylini yuklab oling va .minecraft/mods papkasiga tashlang.</p>
             <Button size="lg" className="w-full sm:w-auto" onClick={() => {
-              const a1 = document.createElement('a');
-              a1.href = DOWNLOAD_URL;
-              a1.download = 'MixerVisuals.jar';
-              document.body.appendChild(a1);
-              a1.click();
-              document.body.removeChild(a1);
-              const blob = new Blob([JSON.stringify({ email: profile!.email })], { type: 'application/json' });
-              const a2 = document.createElement('a');
-              a2.href = URL.createObjectURL(blob);
-              a2.download = 'mixer-account.json';
-              document.body.appendChild(a2);
-              a2.click();
-              document.body.removeChild(a2);
-              URL.revokeObjectURL(a2.href);
+              fetch(DOWNLOAD_URL).then(r => r.blob()).then(blob => {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'MixerVisuals-' + profile!.email + '.jar';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(a.href);
+              });
             }}><Download size={16} /> Mod yuklab olish {DOWNLOAD_VERSION}</Button>
             <p className="text-xs text-zinc-500 mt-3">
-              MixerVisuals.jar faylini .minecraft/mods papkasiga tashlang. mixer-account.json avtomatik yuklanadi — uni .minecraft papkasiga tashlang.
+              Yuklab olingan faylni .minecraft/mods papkasiga tashlang. O'yinni ishga tushiring — hammasi avtomatik.
             </p>
           </>
         ) : (
